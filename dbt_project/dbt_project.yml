@@ -1,0 +1,38 @@
+# ============================================================
+#  TravelHub — dbt Project Configuration
+# ============================================================
+
+name: 'travelhub'
+version: '1.0.0'
+config-version: 2
+
+profile: 'travelhub'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+vars:
+  execution_date: "2026-10-01"
+
+models:
+  travelhub:
+    staging:
+      +schema: staging
+      +materialized: view
+    dimensions:
+      +schema: analytics
+      +materialized: table
+    marts:
+      +schema: analytics
+      +materialized: incremental
+    reporting:
+      +schema: analytics
+      +materialized: table

@@ -1,0 +1,47 @@
+# ============================================================
+#  dbt Schema — Dimensions
+# ============================================================
+
+version: 2
+
+models:
+  - name: dim_dates
+    description: "Date dimension spanning 3 years (2024-2026)"
+    columns:
+      - name: date_id
+        description: "Date key in YYYYMMDD format"
+        tests:
+          - unique
+          - not_null
+
+  - name: dim_hotels
+    description: "Hotel dimension (SCD Type 2)"
+    columns:
+      - name: hotel_sk
+        description: "Surrogate key"
+        tests:
+          - not_null
+      - name: hotel_id
+        description: "Natural key"
+        tests:
+          - not_null
+
+  - name: dim_customers
+    description: "Customer dimension with PII masked"
+    columns:
+      - name: customer_sk
+        description: "Surrogate key"
+        tests:
+          - not_null
+      - name: user_id
+        description: "Natural key"
+        tests:
+          - not_null
+
+  - name: dim_channels
+    description: "Booking channel dimension"
+    columns:
+      - name: channel_id
+        tests:
+          - unique
+          - not_null

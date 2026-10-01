@@ -1,0 +1,26 @@
+# ============================================================
+#  dbt Profile — ClickHouse Connection
+# ============================================================
+
+travelhub:
+  target: dev
+  outputs:
+    dev:
+      type: clickhouse
+      schema: analytics
+      host: "{{ env_var('CLICKHOUSE_HOST', 'clickhouse') }}"
+      port: 8123
+      user: "{{ env_var('CLICKHOUSE_USER', 'travelhub') }}"
+      password: "{{ env_var('CLICKHOUSE_PASSWORD', 'clickhouse_secret_2026') }}"
+      secure: false
+      verify: false
+
+    prod:
+      type: clickhouse
+      schema: analytics
+      host: "{{ env_var('CLICKHOUSE_HOST', 'clickhouse') }}"
+      port: 8123
+      user: "{{ env_var('CLICKHOUSE_USER', 'travelhub') }}"
+      password: "{{ env_var('CLICKHOUSE_PASSWORD', 'clickhouse_secret_2026') }}"
+      secure: false
+      verify: false

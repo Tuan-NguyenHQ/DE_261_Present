@@ -1,0 +1,48 @@
+# ============================================================
+#  dbt Sources — Staging tables in ClickHouse
+# ============================================================
+
+version: 2
+
+sources:
+  - name: staging
+    database: staging
+    schema: staging
+    description: "Raw data loaded by Spark from Data Lake bronze/silver layers"
+    tables:
+      - name: bookings
+        description: "Booking transactions from Booking Engine & Partner APIs"
+        columns:
+          - name: booking_id
+            description: "Unique booking identifier"
+            tests: [not_null]
+          - name: hotel_id
+            tests: [not_null]
+
+      - name: hotels
+        description: "Hotel master data from Property Management System (PMS)"
+        columns:
+          - name: hotel_id
+            tests: [not_null]
+          - name: hotel_name
+            tests: [not_null]
+
+      - name: payments
+        description: "Payment transactions from Payment Gateway"
+        columns:
+          - name: payment_id
+            tests: [not_null]
+          - name: booking_id
+            tests: [not_null]
+
+      - name: customers
+        description: "Customer data from CRM (PII already masked in silver)"
+        columns:
+          - name: user_id
+            tests: [not_null]
+
+      - name: clickstream
+        description: "Web/app user behavior events from tracking system"
+        columns:
+          - name: event_id
+            tests: [not_null]

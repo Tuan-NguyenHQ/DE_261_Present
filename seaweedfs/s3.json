@@ -1,0 +1,20 @@
+{
+  "identities": [
+    {
+      "name": "travelhub",
+      "credentials": [
+        {
+          "accessKey": "travelhub",
+          "secretKey": "travelhub_secret_2026"
+        }
+      ],
+      "actions": [
+        "Admin",
+        "Read",
+        "Write",
+        "List",
+        "Tagging"
+      ]
+    }
+  ]
+}

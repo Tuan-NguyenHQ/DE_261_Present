@@ -1,0 +1,65 @@
+# ============================================================
+#  dbt Schema Tests — Marts (Fact Tables)
+# ============================================================
+
+version: 2
+
+models:
+  - name: fact_bookings
+    description: "Booking transactions fact table. Grain: 1 booking"
+    columns:
+      - name: booking_id
+        description: "Unique booking identifier"
+        tests:
+          - unique
+          - not_null
+      - name: hotel_sk
+        description: "Surrogate key → dim_hotels"
+        tests:
+          - not_null
+      - name: nights
+        description: "Number of nights stayed"
+        tests:
+          - not_null
+      - name: total_amount
+        description: "Booking total amount in original currency"
+
+  - name: fact_payments
+    description: "Payment transactions fact table. Grain: 1 payment"
+    columns:
+      - name: payment_id
+        description: "Unique payment identifier"
+        tests:
+          - unique
+          - not_null
+      - name: booking_id
+        description: "FK → booking"
+        tests:
+          - not_null
+      - name: amount
+        description: "Payment amount"
+
+  - name: fact_web_sessions
+    description: "Web sessions aggregated from clickstream. Grain: 1 session"
+    columns:
+      - name: session_id
+        description: "Unique session identifier"
+        tests:
+          - unique
+          - not_null
+      - name: total_events
+        description: "Total events in the session"
+        tests:
+          - not_null
+
+  - name: fact_hotel_inventory
+    description: "Hotel room inventory by date. Grain: hotel × date × room_type"
+    columns:
+      - name: hotel_sk
+        tests:
+          - not_null
+      - name: date_id
+        tests:
+          - not_null
+      - name: occupancy_rate
+        description: "Occupancy percentage (0-100)"

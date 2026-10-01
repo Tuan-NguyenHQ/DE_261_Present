@@ -1,0 +1,184 @@
+# ============================================================
+#  TravelHub Data Platform — Docker Compose
+#  Services: SeaweedFS · Spark · ClickHouse · dbt · Superset · Grafana
+# ============================================================
+
+x-spark-common: &spark-common
+  image: apache/spark:3.5.3
+  volumes:
+    - ./spark_jobs:/opt/spark-jobs
+    - ./data/sample:/opt/sample-data
+  environment: &spark-env
+    MINIO_ENDPOINT: http://seaweedfs-s3:8333
+    MINIO_ACCESS_KEY: travelhub
+    MINIO_SECRET_KEY: ${MINIO_SECRET:-travelhub_secret_2026}
+    CLICKHOUSE_HOST: clickhouse
+    CLICKHOUSE_PORT: "8123"
+    CLICKHOUSE_USER: travelhub
+    CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhouse_secret_2026}
+  networks:
+    - travelhub-net
+
+services:
+  # ──────────────── Object Storage (Data Lake) — SeaweedFS ────────────────
+  seaweedfs-master:
+    image: chrislusf/seaweedfs
+    container_name: travelhub-seaweedfs-master
+    command: "master -ip=seaweedfs-master -port=9333"
+    ports:
+      - "9333:9333"
+    networks:
+      - travelhub-net
+
+  seaweedfs-volume:
+    image: chrislusf/seaweedfs
+    container_name: travelhub-seaweedfs-volume
+    command: "volume -mserver=seaweedfs-master:9333 -port=8080 -dir=/data"
+    depends_on:
+      - seaweedfs-master
+    volumes:
+      - seaweedfs_data:/data
+    networks:
+      - travelhub-net
+
+  seaweedfs-filer:
+    image: chrislusf/seaweedfs
+    container_name: travelhub-seaweedfs-filer
+    command: "filer -master=seaweedfs-master:9333 -port=8888"
+    depends_on:
+      - seaweedfs-master
+      - seaweedfs-volume
+    ports:
+      - "8888:8888"
+    networks:
+      - travelhub-net
+
+  seaweedfs-s3:
+    image: chrislusf/seaweedfs
+    container_name: travelhub-seaweedfs-s3
+    command: "s3 -filer=seaweedfs-filer:8888 -port=8333 -config=/etc/seaweedfs/s3.json"
+    depends_on:
+      - seaweedfs-filer
+    ports:
+      - "8333:8333"
+    volumes:
+      - ./seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+    networks:
+      - travelhub-net
+
+  # ──────────────── OLAP Data Warehouse ────────────────
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3
+    container_name: travelhub-clickhouse
+    ports:
+      - "8123:8123"
+      - "9440:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./clickhouse/init:/docker-entrypoint-initdb.d
+    environment:
+      CLICKHOUSE_DB: analytics
+      CLICKHOUSE_USER: travelhub
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhouse_secret_2026}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - travelhub-net
+
+  # ──────────────── Apache Spark (Processing Engine) ────────────────
+  spark-master:
+    <<: *spark-common
+    container_name: travelhub-spark-master
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+    ports:
+      - "7077:7077"
+      - "8880:8080"
+
+  spark-worker:
+    <<: *spark-common
+    container_name: travelhub-spark-worker
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    environment:
+      <<: *spark-env
+      SPARK_WORKER_MEMORY: 4G
+      SPARK_WORKER_CORES: 2
+    depends_on:
+      - spark-master
+
+  # ──────────────── Pipeline Runner ────────────────
+  pipeline-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.pipeline
+    container_name: travelhub-pipeline
+    volumes:
+      - ./spark_jobs:/opt/spark-jobs
+      - ./dbt_project:/opt/dbt
+      - ./data/sample:/opt/sample-data
+      - ./scripts:/opt/scripts
+      - pipeline_logs:/opt/logs
+    environment:
+      MINIO_ENDPOINT: http://seaweedfs-s3:8333
+      MINIO_ACCESS_KEY: travelhub
+      MINIO_SECRET_KEY: ${MINIO_SECRET:-travelhub_secret_2026}
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: "8123"
+      CLICKHOUSE_USER: travelhub
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhouse_secret_2026}
+      SPARK_MASTER: spark://spark-master:7077
+    depends_on:
+      seaweedfs-s3:
+        condition: service_started
+      clickhouse:
+        condition: service_healthy
+      spark-master:
+        condition: service_started
+      spark-worker:
+        condition: service_started
+    networks:
+      - travelhub-net
+    # Keep container alive for manual pipeline runs
+    command: ["tail", "-f", "/dev/null"]
+
+  # ──────────────── BI Dashboard ────────────────
+  superset:
+    image: apache/superset:3.1.0
+    container_name: travelhub-superset
+    ports:
+      - "8088:8088"
+    environment:
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET:-superset_secret_key_2026}
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: admin
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    networks:
+      - travelhub-net
+
+  # ──────────────── Monitoring ────────────────
+  grafana:
+    image: grafana/grafana:latest
+    container_name: travelhub-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-grafana_secret_2026}
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - travelhub-net
+
+volumes:
+  seaweedfs_data:
+  clickhouse_data:
+  grafana_data:
+  pipeline_logs:
+
+networks:
+  travelhub-net:
+    driver: bridge
