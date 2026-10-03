@@ -36,3 +36,12 @@ models:
     reporting:
       +schema: analytics
       +materialized: table
+
+seeds:
+  travelhub:
+    +schema: analytics
+    fx_rates:
+      +column_types:
+        currency: String
+        units_per_usd: Decimal(18, 6)
+        valid_from: Date

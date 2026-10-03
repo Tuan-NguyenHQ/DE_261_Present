@@ -1,5 +1,5 @@
 # ============================================================
-#  dbt Schema — Dimensions
+#  dbt Schema - Dimensions
 # ============================================================
 
 version: 2
@@ -15,23 +15,37 @@ models:
           - not_null
 
   - name: dim_hotels
-    description: "Hotel dimension (SCD Type 2)"
+    description: >
+      Hotel dimension (SCD Type 2). Mỗi dòng = 1 version thuộc tính của hotel
+      trong khoảng [valid_from, valid_to]. hotel_sk = 0 là unknown member.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [hotel_id, valid_from]
     columns:
       - name: hotel_sk
-        description: "Surrogate key"
+        description: "Surrogate key = cityHash64(hotel_id, valid_from)"
         tests:
+          - unique
           - not_null
       - name: hotel_id
         description: "Natural key"
         tests:
           - not_null
+      - name: valid_from
+        tests: [not_null]
+      - name: valid_to
+        tests: [not_null]
 
   - name: dim_customers
-    description: "Customer dimension with PII masked"
+    description: "Customer dimension (SCD Type 2, PII masked). customer_sk = 0 là unknown member."
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [user_id, valid_from]
     columns:
       - name: customer_sk
-        description: "Surrogate key"
+        description: "Surrogate key = cityHash64(user_id, valid_from)"
         tests:
+          - unique
           - not_null
       - name: user_id
         description: "Natural key"
@@ -45,3 +59,8 @@ models:
         tests:
           - unique
           - not_null
+      - name: channel_name
+        tests:
+          - unique
+          - accepted_values:
+              values: ['Web', 'Mobile App', 'Partner API', 'Other']

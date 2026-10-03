@@ -1,260 +1,297 @@
 """
 ============================================================
  TravelHub — Spark Cleanse Silver
- Đọc Bronze (staging) → Clean, Type Cast, Dedup, PII Hash
- → Ghi lại vào ClickHouse staging (cleaned)
+ BRONZE (Parquet, all-string)  →  SILVER (Parquet, typed & clean)
+
+ Cho từng entity:
+   1. Chuẩn hoá & ép kiểu (trim/upper, Decimal, Date, Timestamp, Bool)
+   2. Data Quality rules → bản ghi vi phạm kèm _dq_reason → quarantine/
+   3. Dedup theo business key (giữ bản mới nhất) → bản trùng → quarantine/
+   4. PII masking (customers): SHA-256 email/phone, drop full_name
+   5. Ghi s3a://travelhub-lake/silver/<entity>/dt=YYYY-MM-DD/ (overwrite)
+   6. Circuit breaker: tỉ lệ vi phạm DQ > DQ_MAX_REJECT_RATIO → fail job
+
+ Silver schema = contract để load vào ClickHouse staging.*
+
+ Usage: spark-submit cleanse_silver.py YYYY-MM-DD
 ============================================================
 """
 
 import os
 import sys
-import hashlib
-import logging
-from datetime import date as dt
-from pyspark.sql import SparkSession, functions as F
-from pyspark.sql.types import DecimalType, IntegerType, DateType, TimestampType
 
-logging.basicConfig(level=logging.INFO,
-                    format="%(asctime)s [%(levelname)s] %(message)s")
-log = logging.getLogger("cleanse_silver")
+from pyspark.sql import DataFrame, Window
+from pyspark.sql import functions as F
+from pyspark.sql.types import BooleanType, DecimalType, IntegerType, StringType
 
-# ──────────────── CONFIG ────────────────
-CH_HOST     = os.environ.get("CLICKHOUSE_HOST", "clickhouse")
-CH_PORT     = os.environ.get("CLICKHOUSE_PORT", "8123")
-CH_USER     = os.environ.get("CLICKHOUSE_USER", "travelhub")
-CH_PASSWORD = os.environ.get("CLICKHOUSE_PASSWORD", "clickhouse_secret_2026")
+from common import create_spark, emit_metrics, get_logger, lake_path, parse_date_arg, path_exists
 
-CH_JDBC_URL = f"jdbc:clickhouse://{CH_HOST}:{CH_PORT}/staging"
-CH_PROPS = {
-    "driver":   "com.clickhouse.jdbc.ClickHouseDriver",
-    "user":     CH_USER,
-    "password": CH_PASSWORD,
+log = get_logger("cleanse_silver")
+
+DQ_MAX_REJECT_RATIO = float(os.environ.get("DQ_MAX_REJECT_RATIO", "0.2"))
+META_COLS = ["_source_file", "_ingested_at", "_batch_date"]
+
+
+# ──────────────── HELPERS ────────────────
+
+def clean_str(col):
+    """trim + chuỗi rỗng → NULL."""
+    c = F.trim(F.col(col))
+    return F.when(c == "", F.lit(None).cast(StringType())).otherwise(c)
+
+
+def to_money(col):
+    """'$23,245,166.00' / '44,501,545 VND' / ' 1,000 ' → Decimal(15,2). Không parse được → NULL."""
+    digits = F.regexp_replace(F.col(col), r"[^0-9.]", "")
+    return F.when(digits == "", None).otherwise(digits).cast(DecimalType(15, 2))
+
+
+def to_bool(col):
+    v = F.lower(F.trim(F.col(col)))
+    return (F.when(v.isin("true", "1", "yes", "y"), F.lit(True))
+             .when(v.isin("false", "0", "no", "n"), F.lit(False))
+             .otherwise(F.lit(None).cast(BooleanType())))
+
+
+def dq_reason(*rules):
+    """rules: (condition_is_bad, code). Trả về chuỗi các mã lỗi, '' nếu hợp lệ."""
+    return F.concat_ws(";", *[F.when(cond, F.lit(code)) for cond, code in rules])
+
+
+def split_dq(df: DataFrame, rules, key, order_col):
+    """
+    → (valid_df, quarantine_df)
+    - valid: không vi phạm rule, đã dedup theo key (giữ order_col mới nhất)
+    - quarantine: vi phạm rule hoặc trùng key, kèm _dq_reason
+    """
+    df = df.withColumn("_dq_reason", dq_reason(*rules))
+    invalid = df.filter(F.col("_dq_reason") != "")
+    valid = df.filter(F.col("_dq_reason") == "")
+
+    w = Window.partitionBy(key).orderBy(F.col(order_col).desc_nulls_last(),
+                                        F.col("_source_file"))
+    ranked = valid.withColumn("_rn", F.row_number().over(w))
+    dups = ranked.filter("_rn > 1").drop("_rn").withColumn("_dq_reason", F.lit("DUPLICATE_KEY"))
+    valid = ranked.filter("_rn = 1").drop("_rn", "_dq_reason")
+
+    quarantine = invalid.unionByName(dups)
+    return valid, quarantine
+
+
+# ──────────────── ENTITY TRANSFORMS ────────────────
+
+def transform_bookings(df):
+    status = F.upper(F.trim("booking_status"))
+    channel = F.lower(F.trim("source_channel"))
+    out = df.select(
+        F.upper(clean_str("booking_id")).alias("booking_id"),
+        F.upper(clean_str("hotel_id")).alias("hotel_id"),
+        F.upper(clean_str("user_id")).alias("user_id"),
+        clean_str("room_type").alias("room_type"),
+        F.to_date(clean_str("checkin_date"), "yyyy-MM-dd").alias("checkin_date"),
+        F.to_date(clean_str("checkout_date"), "yyyy-MM-dd").alias("checkout_date"),
+        to_money("total_amount").alias("total_amount"),
+        F.upper(clean_str("currency")).alias("currency"),
+        F.when(status.isin("CONFIRMED", "CONFIRM", "1"), "CONFIRMED")
+         .when(status.isin("CANCELLED", "CANCELED", "CANCEL"), "CANCELLED")
+         .when(status == "PENDING", "PENDING")
+         .when(status == "NO_SHOW", "NO_SHOW")
+         .otherwise("UNKNOWN").alias("booking_status"),
+        # Giá trị chuẩn = tên kênh trong dim_channels
+        F.when(channel.isin("app_ios", "app_android", "mobile app"), "Mobile App")
+         .when(channel.isin("web", "website"), "Web")
+         .when(channel.startswith("partner"), "Partner API")
+         .otherwise("Other").alias("booking_channel"),
+        F.upper(clean_str("payment_method")).alias("payment_method"),
+        F.to_timestamp(clean_str("created_at"), "yyyy-MM-dd HH:mm:ss").alias("created_at"),
+        *META_COLS,
+    ).withColumn("nights", F.datediff("checkout_date", "checkin_date").cast(IntegerType()))
+
+    rules = [
+        (F.col("booking_id").isNull(), "MISSING_BOOKING_ID"),
+        (F.col("hotel_id").isNull(), "MISSING_HOTEL_ID"),
+        (F.col("checkin_date").isNull() | F.col("checkout_date").isNull(), "INVALID_DATE"),
+        (F.coalesce(F.col("nights"), F.lit(0)) <= 0, "NON_POSITIVE_NIGHTS"),
+        (F.col("total_amount").isNull(), "INVALID_AMOUNT"),
+        (F.col("currency").isNull(), "MISSING_CURRENCY"),
+    ]
+    return out, rules, "booking_id", "created_at"
+
+
+def transform_hotels(df):
+    facilities = F.regexp_replace(F.col("facilities"), r"[\[\]'\" ]", "")
+    out = df.select(
+        F.upper(clean_str("hotel_id")).alias("hotel_id"),
+        clean_str("hotel_name").alias("hotel_name"),
+        F.lower(clean_str("hotel_tier")).alias("hotel_tier"),
+        clean_str("star_rating").cast(IntegerType()).alias("star_rating"),
+        clean_str("city").alias("city"),
+        F.upper(clean_str("country")).alias("country"),
+        clean_str("region").alias("region"),
+        clean_str("latitude").cast("double").alias("latitude"),
+        clean_str("longitude").cast("double").alias("longitude"),
+        clean_str("total_rooms").cast(IntegerType()).alias("total_rooms"),
+        # "['bar', 'beach']" → "bar,beach"  (dbt tách thành Array(String))
+        F.lower(F.coalesce(facilities, F.lit(""))).alias("facilities"),
+        F.to_date(clean_str("partner_since"), "yyyy-MM-dd").alias("partner_since"),
+        F.coalesce(to_bool("is_active"), F.lit(False)).alias("is_active"),
+        *META_COLS,
+    )
+    rules = [
+        (F.col("hotel_id").isNull(), "MISSING_HOTEL_ID"),
+        (F.col("hotel_name").isNull(), "MISSING_HOTEL_NAME"),
+        (~F.coalesce(F.col("star_rating").between(1, 5), F.lit(False)), "INVALID_STAR_RATING"),
+        (F.coalesce(F.col("total_rooms"), F.lit(0)) <= 0, "INVALID_TOTAL_ROOMS"),
+    ]
+    return out, rules, "hotel_id", "_ingested_at"
+
+
+def transform_payments(df):
+    refund = to_money("refund_amount")
+    out = df.select(
+        F.upper(clean_str("payment_id")).alias("payment_id"),
+        F.upper(clean_str("booking_id")).alias("booking_id"),
+        to_money("amount").alias("amount"),
+        F.upper(clean_str("currency")).alias("currency"),
+        F.upper(clean_str("payment_method")).alias("payment_method"),
+        F.upper(clean_str("payment_status")).alias("payment_status"),
+        F.coalesce(clean_str("gateway_code"), F.lit("")).alias("gateway_code"),
+        F.to_timestamp(clean_str("processed_at"), "yyyy-MM-dd HH:mm:ss").alias("processed_at"),
+        F.coalesce(refund, F.lit(0).cast(DecimalType(15, 2))).alias("refund_amount"),
+        F.to_timestamp(clean_str("refund_at"), "yyyy-MM-dd HH:mm:ss").alias("refund_at"),
+        *META_COLS,
+    )
+    rules = [
+        (F.col("payment_id").isNull(), "MISSING_PAYMENT_ID"),
+        (F.col("booking_id").isNull(), "MISSING_BOOKING_ID"),
+        (F.col("amount").isNull(), "INVALID_AMOUNT"),
+        (F.col("processed_at").isNull(), "INVALID_PROCESSED_AT"),
+    ]
+    return out, rules, "payment_id", "processed_at"
+
+
+def transform_customers(df):
+    email_norm = F.lower(clean_str("email"))
+    phone_norm = F.regexp_replace(clean_str("phone"), r"[^0-9+]", "")
+    out = df.select(
+        F.upper(clean_str("user_id")).alias("user_id"),
+        # PII masking — chỉ hash rời khỏi silver, full_name/email/phone bị loại bỏ
+        F.coalesce(F.sha2(email_norm, 256), F.lit("")).alias("email_hash"),
+        F.coalesce(F.sha2(phone_norm, 256), F.lit("")).alias("phone_hash"),
+        F.upper(clean_str("country")).alias("country"),
+        F.lower(clean_str("user_segment")).alias("user_segment"),
+        F.initcap(clean_str("loyalty_tier")).alias("loyalty_tier"),
+        F.coalesce(clean_str("loyalty_points").cast(IntegerType()), F.lit(0)).alias("loyalty_points"),
+        F.to_date(clean_str("first_booking_date"), "yyyy-MM-dd").alias("first_booking_date"),
+        F.coalesce(clean_str("total_bookings").cast(IntegerType()), F.lit(0)).alias("total_bookings"),
+        F.coalesce(to_bool("is_active"), F.lit(False)).alias("is_active"),
+        F.to_date(clean_str("registered_at"), "yyyy-MM-dd").alias("registered_at"),
+        *META_COLS,
+    )
+    rules = [
+        (F.col("user_id").isNull(), "MISSING_USER_ID"),
+        (F.col("email_hash") == "", "MISSING_EMAIL"),
+    ]
+    return out, rules, "user_id", "_ingested_at"
+
+
+def transform_clickstream(df):
+    out = df.select(
+        clean_str("event_id").alias("event_id"),
+        clean_str("session_id").alias("session_id"),
+        F.upper(clean_str("user_id")).alias("user_id"),            # nullable (anonymous)
+        F.lower(clean_str("event_type")).alias("event_type"),
+        F.coalesce(clean_str("page_url"), F.lit("")).alias("page_url"),
+        F.upper(clean_str("hotel_id")).alias("hotel_id"),          # nullable
+        clean_str("search_query").alias("search_query"),           # nullable
+        F.lower(clean_str("device_type")).alias("device_type"),
+        F.coalesce(clean_str("os"), F.lit("")).alias("os"),
+        F.to_timestamp(clean_str("event_timestamp"), "yyyy-MM-dd HH:mm:ss").alias("event_timestamp"),
+        *META_COLS,
+    )
+    rules = [
+        (F.col("event_id").isNull(), "MISSING_EVENT_ID"),
+        (F.col("session_id").isNull(), "MISSING_SESSION_ID"),
+        (F.col("event_timestamp").isNull(), "INVALID_TIMESTAMP"),
+        (F.col("event_type").isNull(), "MISSING_EVENT_TYPE"),
+    ]
+    return out, rules, "event_id", "event_timestamp"
+
+
+ENTITIES = {
+    "bookings":    transform_bookings,
+    "hotels":      transform_hotels,
+    "payments":    transform_payments,
+    "customers":   transform_customers,
+    "clickstream": transform_clickstream,
 }
 
 
-def create_spark():
-    jars_dir = "/opt/spark/jars-extra"
-    jars = ",".join([
-        os.path.join(jars_dir, f)
-        for f in os.listdir(jars_dir) if f.endswith(".jar")
-    ]) if os.path.isdir(jars_dir) else ""
+# ──────────────── RUN 1 ENTITY ────────────────
 
-    builder = SparkSession.builder.appName("TravelHub_Silver_Cleanse")
-    if jars:
-        builder = builder.config("spark.jars", jars)
-    return builder.getOrCreate()
+def cleanse_entity(spark, entity, date_str):
+    src = lake_path("bronze", entity, date_str)
+    if not path_exists(spark, src):
+        raise FileNotFoundError(f"Bronze not found: {src}")
 
+    bronze = spark.read.parquet(src)
+    n_bronze = bronze.count()
 
-def read_staging(spark, table, date_str):
-    """Read data from ClickHouse staging table for a given batch date."""
-    df = spark.read \
-        .format("jdbc") \
-        .option("url", CH_JDBC_URL) \
-        .option("dbtable", f"(SELECT * FROM staging.{table} WHERE _batch_date = '{date_str}')") \
-        .options(**CH_PROPS) \
-        .load()
-    log.info(f"   Read {df.count()} rows from staging.{table}")
-    return df
+    typed, rules, key, order_col = ENTITIES[entity](bronze)
+    valid, quarantine = split_dq(typed, rules, key, order_col)
+    valid, quarantine = valid.cache(), quarantine.cache()
 
+    n_valid = valid.count()
+    n_dup = quarantine.filter(F.col("_dq_reason") == "DUPLICATE_KEY").count()
+    n_invalid = quarantine.count() - n_dup
 
-def write_staging(df, table):
-    """Write cleaned data back to ClickHouse staging (overwrite by partition)."""
-    df.write \
-        .format("jdbc") \
-        .option("url", CH_JDBC_URL) \
-        .option("dbtable", f"staging.{table}") \
-        .options(**CH_PROPS) \
-        .mode("append") \
-        .save()
+    valid.write.mode("overwrite").parquet(lake_path("silver", entity, date_str))
+    quarantine.coalesce(1).write.mode("overwrite").parquet(lake_path("quarantine", entity, date_str))
 
+    reasons = {}
+    if n_invalid:
+        for r in (quarantine.filter(F.col("_dq_reason") != "DUPLICATE_KEY")
+                  .groupBy("_dq_reason").count().collect()):
+            reasons[r["_dq_reason"]] = r["count"]
 
-# ──────────────── CLEANSE FUNCTIONS ────────────────
+    ratio = (n_invalid / n_bronze) if n_bronze else 0.0
+    log.info(f"   ✅ {entity}: bronze={n_bronze} → silver={n_valid} "
+             f"| dup={n_dup} | dq_invalid={n_invalid} ({ratio:.1%}) {reasons or ''}")
 
-def cleanse_bookings(spark, date_str):
-    """
-    Clean bookings data:
-    - Strip currency symbols from total_amount
-    - Normalize booking_status
-    - Map source_channel → booking_channel
-    - Calculate nights
-    - Dedup by booking_id
-    """
-    log.info("🔧 Cleansing bookings...")
+    valid.unpersist()
+    quarantine.unpersist()
 
-    df = read_staging(spark, "bookings", date_str)
+    if ratio > DQ_MAX_REJECT_RATIO:
+        raise RuntimeError(
+            f"DQ circuit breaker: {entity} invalid ratio {ratio:.1%} > {DQ_MAX_REJECT_RATIO:.0%}")
 
-    df_clean = df \
-        .withColumn("booking_id", F.upper(F.trim("booking_id"))) \
-        .withColumn("hotel_id", F.upper(F.trim("hotel_id"))) \
-        .withColumn("user_id", F.trim("user_id")) \
-        .withColumn("checkin_date",
-            F.to_date("checkin_date", "yyyy-MM-dd")) \
-        .withColumn("checkout_date",
-            F.to_date("checkout_date", "yyyy-MM-dd")) \
-        .withColumn("total_amount",
-            F.regexp_replace("total_amount", "[^0-9.]", "").cast(DecimalType(15, 2))) \
-        .withColumn("currency", F.upper(F.trim("currency"))) \
-        .withColumn("booking_status",
-            F.when(F.upper("booking_status").isin("CONFIRMED", "CONFIRM", "1"), "CONFIRMED")
-             .when(F.upper("booking_status").isin("CANCELLED", "CANCEL"), "CANCELLED")
-             .when(F.upper("booking_status") == "PENDING", "PENDING")
-             .when(F.upper("booking_status") == "NO_SHOW", "NO_SHOW")
-             .otherwise("UNKNOWN")) \
-        .withColumn("booking_channel",
-            F.when(F.lower("source_channel").isin("app_ios", "app_android"), "Mobile App")
-             .when(F.lower("source_channel").isin("web", "website"), "Web")
-             .when(F.lower("source_channel").startswith("partner"), "Partner API")
-             .otherwise("Other")) \
-        .withColumn("nights",
-            F.datediff("checkout_date", "checkin_date").cast(IntegerType())) \
-        .filter(F.col("booking_id").isNotNull()) \
-        .filter(F.col("nights") > 0) \
-        .dropDuplicates(["booking_id"])
-
-    count = df_clean.count()
-    log.info(f"   ✅ Bookings cleaned: {count} rows")
-    return df_clean, count
-
-
-def cleanse_hotels(spark, date_str):
-    """Clean hotels data: type cast, normalize tiers."""
-    log.info("🔧 Cleansing hotels...")
-
-    df = read_staging(spark, "hotels", date_str)
-
-    df_clean = df \
-        .withColumn("hotel_id", F.upper(F.trim("hotel_id"))) \
-        .withColumn("hotel_name", F.trim("hotel_name")) \
-        .withColumn("hotel_tier", F.lower(F.trim("hotel_tier"))) \
-        .withColumn("star_rating",
-            F.col("star_rating").cast(IntegerType())) \
-        .withColumn("latitude",
-            F.col("latitude").cast("double")) \
-        .withColumn("longitude",
-            F.col("longitude").cast("double")) \
-        .withColumn("total_rooms",
-            F.col("total_rooms").cast(IntegerType())) \
-        .withColumn("is_active",
-            F.when(F.lower("is_active") == "true", F.lit(True)).otherwise(F.lit(False))) \
-        .filter(F.col("hotel_id").isNotNull()) \
-        .dropDuplicates(["hotel_id"])
-
-    count = df_clean.count()
-    log.info(f"   ✅ Hotels cleaned: {count} rows")
-    return df_clean, count
-
-
-def cleanse_payments(spark, date_str):
-    """Clean payments: type cast amounts, normalize statuses."""
-    log.info("🔧 Cleansing payments...")
-
-    df = read_staging(spark, "payments", date_str)
-
-    df_clean = df \
-        .withColumn("payment_id", F.upper(F.trim("payment_id"))) \
-        .withColumn("booking_id", F.upper(F.trim("booking_id"))) \
-        .withColumn("amount",
-            F.regexp_replace("amount", "[^0-9.]", "").cast(DecimalType(15, 2))) \
-        .withColumn("currency", F.upper(F.trim("currency"))) \
-        .withColumn("payment_status", F.upper(F.trim("payment_status"))) \
-        .withColumn("refund_amount",
-            F.when(F.col("refund_amount").isNull(), F.lit(0))
-             .otherwise(F.regexp_replace("refund_amount", "[^0-9.]", "").cast(DecimalType(15, 2)))) \
-        .filter(F.col("payment_id").isNotNull()) \
-        .dropDuplicates(["payment_id"])
-
-    count = df_clean.count()
-    log.info(f"   ✅ Payments cleaned: {count} rows")
-    return df_clean, count
-
-
-def cleanse_customers(spark, date_str):
-    """
-    Clean customers: PII masking (hash email, phone, drop full_name).
-    """
-    log.info("🔧 Cleansing customers (PII masking)...")
-
-    sha256_udf = F.udf(
-        lambda v: hashlib.sha256(v.encode()).hexdigest() if v else None,
-        "string"
-    )
-
-    df = read_staging(spark, "customers", date_str)
-
-    df_clean = df \
-        .withColumn("user_id", F.trim("user_id")) \
-        .withColumn("email_hash", sha256_udf(F.col("email"))) \
-        .withColumn("phone_hash", sha256_udf(F.col("phone"))) \
-        .withColumn("country", F.upper(F.trim("country"))) \
-        .withColumn("user_segment", F.lower(F.trim("user_segment"))) \
-        .withColumn("loyalty_tier", F.initcap(F.trim("loyalty_tier"))) \
-        .withColumn("loyalty_points",
-            F.col("loyalty_points").cast(IntegerType())) \
-        .withColumn("total_bookings",
-            F.col("total_bookings").cast(IntegerType())) \
-        .withColumn("is_active",
-            F.when(F.lower("is_active") == "true", F.lit(True)).otherwise(F.lit(False))) \
-        .drop("email", "phone", "full_name") \
-        .filter(F.col("user_id").isNotNull()) \
-        .dropDuplicates(["user_id"])
-
-    count = df_clean.count()
-    log.info(f"   ✅ Customers cleaned (PII masked): {count} rows")
-    return df_clean, count
-
-
-def cleanse_clickstream(spark, date_str):
-    """Clean clickstream events: normalize, type cast."""
-    log.info("🔧 Cleansing clickstream...")
-
-    df = read_staging(spark, "clickstream", date_str)
-
-    df_clean = df \
-        .withColumn("event_id", F.trim("event_id")) \
-        .withColumn("session_id", F.trim("session_id")) \
-        .withColumn("event_type", F.lower(F.trim("event_type"))) \
-        .withColumn("device_type", F.lower(F.trim("device_type"))) \
-        .withColumn("event_timestamp",
-            F.to_timestamp("event_timestamp", "yyyy-MM-dd HH:mm:ss")) \
-        .filter(F.col("event_id").isNotNull()) \
-        .dropDuplicates(["event_id"])
-
-    count = df_clean.count()
-    log.info(f"   ✅ Clickstream cleaned: {count} rows")
-    return df_clean, count
+    return {"bronze_rows": n_bronze, "silver_rows": n_valid,
+            "duplicates": n_dup, "dq_invalid": n_invalid, "dq_reasons": reasons}
 
 
 # ──────────────── MAIN ────────────────
 
 def run(date_str):
-    log.info(f"🚀 SILVER CLEANSE START [{date_str}]")
-    spark = create_spark()
-    results = {}
+    log.info(f"🚀 SILVER CLEANSE START [{date_str}] (max reject ratio {DQ_MAX_REJECT_RATIO:.0%})")
+    spark = create_spark("TravelHub_Silver_Cleanse")
 
-    cleaners = [
-        ("bookings",    cleanse_bookings),
-        ("hotels",      cleanse_hotels),
-        ("payments",    cleanse_payments),
-        ("customers",   cleanse_customers),
-        ("clickstream", cleanse_clickstream),
-    ]
-
-    for name, cleaner in cleaners:
+    results, failed = {}, []
+    for entity in ENTITIES:
+        log.info(f"🔧 Cleansing {entity}...")
         try:
-            df_clean, count = cleaner(spark, date_str)
-            results[name] = count
-            # Write cleaned data back
-            # In production: write to separate silver tables
-            # Here: data is already cleaned in memory
-        except Exception as e:
-            log.error(f"❌ {name} cleanse failed: {e}")
-            results[name] = -1
+            results[entity] = cleanse_entity(spark, entity, date_str)
+        except Exception as e:  # noqa: BLE001
+            log.error(f"❌ {entity} cleanse failed: {e}")
+            results[entity] = {"error": str(e)[:300]}
+            failed.append(entity)
 
-    log.info(f"📊 SILVER CLEANSE RESULTS: {results}")
     spark.stop()
-    return results
+    total = sum(r.get("silver_rows", 0) for r in results.values())
+    emit_metrics("silver", {"rows": total, "entities": results, "failed": failed})
+    log.info(f"📊 SILVER RESULTS: {results}")
+    return not failed
 
 
 if __name__ == "__main__":
-    date_arg = sys.argv[1] if len(sys.argv) > 1 else str(dt.today())
-    run(date_arg)
+    ok = run(parse_date_arg())
+    sys.exit(0 if ok else 1)

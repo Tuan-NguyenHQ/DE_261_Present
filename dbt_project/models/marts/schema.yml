@@ -1,5 +1,7 @@
 # ============================================================
-#  dbt Schema Tests — Marts (Fact Tables)
+#  dbt Schema Tests - Marts (Fact Tables)
+#  - relationships: FK phải tồn tại trong dim (error) — có ý nghĩa nhờ join_use_nulls=1
+#  - unknown member / orphan / thiếu tỷ giá: severity warn (báo cáo, không chặn pipeline)
 # ============================================================
 
 version: 2
@@ -7,6 +9,22 @@ version: 2
 models:
   - name: fact_bookings
     description: "Booking transactions fact table. Grain: 1 booking"
+    tests:
+      - dbt_utils.expression_is_true:
+          name: fact_bookings_hotel_resolved
+          expression: "hotel_sk != 0"
+          config:
+            severity: warn
+      - dbt_utils.expression_is_true:
+          name: fact_bookings_customer_resolved
+          expression: "customer_sk != 0"
+          config:
+            severity: warn
+      - dbt_utils.expression_is_true:
+          name: fact_bookings_fx_resolved
+          expression: "amount_usd IS NOT NULL"
+          config:
+            severity: warn
     columns:
       - name: booking_id
         description: "Unique booking identifier"
@@ -14,18 +32,48 @@ models:
           - unique
           - not_null
       - name: hotel_sk
-        description: "Surrogate key → dim_hotels"
+        description: "Surrogate key → dim_hotels (version tại _batch_date)"
         tests:
           - not_null
+          - relationships:
+              to: ref('dim_hotels')
+              field: hotel_sk
+      - name: customer_sk
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_customers')
+              field: customer_sk
+      - name: channel_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_channels')
+              field: channel_id
       - name: nights
         description: "Number of nights stayed"
         tests:
           - not_null
+      - name: booking_status
+        tests:
+          - accepted_values:
+              values: ['CONFIRMED', 'CANCELLED', 'PENDING', 'NO_SHOW', 'UNKNOWN']
       - name: total_amount
         description: "Booking total amount in original currency"
 
   - name: fact_payments
     description: "Payment transactions fact table. Grain: 1 payment"
+    tests:
+      - dbt_utils.expression_is_true:
+          name: fact_payments_no_orphans
+          expression: "NOT is_orphan"
+          config:
+            severity: warn
+      - dbt_utils.expression_is_true:
+          name: fact_payments_fx_resolved
+          expression: "amount_usd IS NOT NULL"
+          config:
+            severity: warn
     columns:
       - name: payment_id
         description: "Unique payment identifier"
@@ -36,6 +84,21 @@ models:
         description: "FK → booking"
         tests:
           - not_null
+          - relationships:
+              to: ref('fact_bookings')
+              field: booking_id
+              config:
+                severity: warn
+      - name: hotel_sk
+        tests:
+          - relationships:
+              to: ref('dim_hotels')
+              field: hotel_sk
+      - name: customer_sk
+        tests:
+          - relationships:
+              to: ref('dim_customers')
+              field: customer_sk
       - name: amount
         description: "Payment amount"
 
@@ -51,13 +114,30 @@ models:
         description: "Total events in the session"
         tests:
           - not_null
+      - name: customer_sk
+        tests:
+          - relationships:
+              to: ref('dim_customers')
+              field: customer_sk
+      - name: booking_id
+        description: "Booking được attribution cho session (NULL nếu không xác định)"
+        tests:
+          - relationships:
+              to: ref('fact_bookings')
+              field: booking_id
 
   - name: fact_hotel_inventory
-    description: "Hotel room inventory by date. Grain: hotel × date × room_type"
+    description: "Hotel room inventory per stay night. Grain: hotel x stay night x room_type"
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [hotel_sk, date_id, room_type]
     columns:
       - name: hotel_sk
         tests:
           - not_null
+          - relationships:
+              to: ref('dim_hotels')
+              field: hotel_sk
       - name: date_id
         tests:
           - not_null

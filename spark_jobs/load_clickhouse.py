@@ -1,293 +1,121 @@
 """
 ============================================================
- TravelHub — Load to ClickHouse (Staging → Analytics)
- Spark reads from local/MinIO and writes to ClickHouse staging
- This is the direct CSV/XML → ClickHouse loader
+ TravelHub — Load Silver → ClickHouse staging
+ SILVER (s3a://travelhub-lake/silver)  →  ClickHouse staging.*
+
+ - Đọc silver Parquet của đúng batch date từ Data Lake
+ - Chọn cột theo contract của bảng staging (thứ tự & tên cố định)
+ - Idempotent: xoá dữ liệu cùng _batch_date trước khi ghi (mutations_sync)
+ - Ghi qua JDBC (append)
+ - Reconciliation: đếm lại trong ClickHouse = số dòng silver, lệch → fail
+
+ Usage: spark-submit load_clickhouse.py YYYY-MM-DD
 ============================================================
 """
 
-import os
 import sys
-import logging
-from datetime import date as dt
-from pyspark.sql import SparkSession, functions as F
-from pyspark.sql.types import *
 
-logging.basicConfig(level=logging.INFO,
-                    format="%(asctime)s [%(levelname)s] %(message)s")
-log = logging.getLogger("load_clickhouse")
+from pyspark.sql import functions as F
 
-CH_HOST     = os.environ.get("CLICKHOUSE_HOST", "clickhouse")
-CH_PORT     = os.environ.get("CLICKHOUSE_PORT", "8123")
-CH_USER     = os.environ.get("CLICKHOUSE_USER", "travelhub")
-CH_PASSWORD = os.environ.get("CLICKHOUSE_PASSWORD", "clickhouse_secret_2026")
+from common import (CH_JDBC_PROPS, CH_JDBC_URL, ch_client, create_spark, emit_metrics,
+                    get_logger, lake_path, parse_date_arg, path_exists)
 
-CH_JDBC_URL = f"jdbc:clickhouse://{CH_HOST}:{CH_PORT}/staging"
-CH_PROPS = {
-    "driver":   "com.clickhouse.jdbc.ClickHouseDriver",
-    "user":     CH_USER,
-    "password": CH_PASSWORD,
+log = get_logger("load_clickhouse")
+
+META = ["_ingested_at", "_source_file", "_batch_date"]
+
+# Contract silver → staging (phải khớp clickhouse/init/01_init_schema.sql)
+STAGING_COLUMNS = {
+    "bookings": ["booking_id", "hotel_id", "user_id", "room_type", "checkin_date",
+                 "checkout_date", "total_amount", "currency", "booking_status",
+                 "booking_channel", "payment_method", "nights", "created_at"] + META,
+    "hotels": ["hotel_id", "hotel_name", "hotel_tier", "star_rating", "city", "country",
+               "region", "latitude", "longitude", "total_rooms", "facilities",
+               "partner_since", "is_active"] + META,
+    "payments": ["payment_id", "booking_id", "amount", "currency", "payment_method",
+                 "payment_status", "gateway_code", "processed_at", "refund_amount",
+                 "refund_at"] + META,
+    "customers": ["user_id", "email_hash", "phone_hash", "country", "user_segment",
+                  "loyalty_tier", "loyalty_points", "first_booking_date", "total_bookings",
+                  "is_active", "registered_at"] + META,
+    "clickstream": ["event_id", "session_id", "user_id", "event_type", "page_url", "hotel_id",
+                    "search_query", "device_type", "os", "event_timestamp"] + META,
 }
 
-JARS_DIR = "/opt/spark/jars-extra"
+# Cột NOT NULL ở ClickHouse cần giá trị mặc định khi silver để NULL
+NON_NULL_DEFAULTS = {
+    "bookings": {"user_id": "", "room_type": "", "booking_channel": "Other",
+                 "payment_method": ""},
+    "hotels": {"hotel_tier": "", "city": "", "country": "", "region": ""},
+    "payments": {"currency": "", "payment_method": "", "payment_status": ""},
+    "customers": {"country": "", "user_segment": "", "loyalty_tier": ""},
+    "clickstream": {"device_type": ""},
+}
 
 
-def create_spark():
-    jars = ",".join([
-        os.path.join(JARS_DIR, f)
-        for f in os.listdir(JARS_DIR) if f.endswith(".jar")
-    ]) if os.path.isdir(JARS_DIR) else ""
+def load_entity(spark, client, entity, date_str):
+    src = lake_path("silver", entity, date_str)
+    if not path_exists(spark, src):
+        raise FileNotFoundError(f"Silver not found: {src}")
 
-    builder = SparkSession.builder.appName("TravelHub_Load_ClickHouse")
-    if jars:
-        builder = builder.config("spark.jars", jars)
-    return builder.getOrCreate()
+    df = spark.read.parquet(src)
+    missing = [c for c in STAGING_COLUMNS[entity] if c not in df.columns]
+    if missing:
+        raise ValueError(f"Silver {entity} thiếu cột theo contract: {missing}")
 
+    df = df.fillna(NON_NULL_DEFAULTS.get(entity, {})) \
+           .select(*STAGING_COLUMNS[entity]) \
+           .withColumn("_batch_date", F.col("_batch_date").cast("date")) \
+           .cache()
+    n_silver = df.count()
 
-def load_bookings(spark, raw_path, date_str):
-    """Load bookings from CSV + XML with normalization and channel mapping."""
-    log.info("📂 Loading bookings (CSV + XML) → staging.bookings")
-    csv_path = f"{raw_path}/bookings/dt={date_str}/*.csv"
-    xml_path = f"{raw_path}/bookings/dt={date_str}/*.xml"
+    # Idempotency: xoá batch cũ cùng ngày (partition theo tháng nên không DROP PARTITION được)
+    client.command(
+        f"ALTER TABLE staging.{entity} DELETE WHERE _batch_date = toDate('{date_str}') "
+        f"SETTINGS mutations_sync = 2"
+    )
 
-    dfs = []
-    try:
-        df_csv = spark.read \
-            .option("header", "true") \
-            .option("encoding", "UTF-8") \
-            .csv(csv_path) \
-            .withColumn("_source_file", F.input_file_name())
-        dfs.append(df_csv)
-    except Exception as e:
-        log.warning(f"No CSV bookings found: {e}")
+    (df.write.format("jdbc")
+       .option("url", CH_JDBC_URL)
+       .option("dbtable", entity)
+       .option("batchsize", 10000)
+       .options(**CH_JDBC_PROPS)
+       .mode("append")
+       .save())
+    df.unpersist()
 
-    try:
-        df_xml = spark.read \
-            .format("com.databricks.spark.xml") \
-            .option("rowTag", "booking") \
-            .option("encoding", "UTF-8") \
-            .load(xml_path) \
-            .withColumn("_source_file", F.input_file_name())
-        dfs.append(df_xml)
-    except Exception as e:
-        log.warning(f"No XML bookings found: {e}")
+    # Reconciliation silver ↔ staging
+    n_ch = client.query(
+        f"SELECT count() FROM staging.{entity} WHERE _batch_date = toDate('{date_str}')"
+    ).result_rows[0][0]
+    if n_ch != n_silver:
+        raise RuntimeError(f"Reconciliation failed {entity}: silver={n_silver} clickhouse={n_ch}")
 
-    if not dfs:
-        return 0
-
-    df = dfs[0]
-    for other in dfs[1:]:
-        df = df.unionByName(other, allowMissingColumns=True)
-
-    df_clean = df \
-        .withColumn("booking_id", F.upper(F.trim("booking_id"))) \
-        .withColumn("hotel_id", F.upper(F.trim("hotel_id"))) \
-        .withColumn("user_id", F.trim("user_id")) \
-        .withColumn("room_type", F.trim("room_type")) \
-        .withColumn("checkin_date", F.to_date("checkin_date", "yyyy-MM-dd")) \
-        .withColumn("checkout_date", F.to_date("checkout_date", "yyyy-MM-dd")) \
-        .withColumn("total_amount",
-            F.regexp_replace("total_amount", "[^0-9.]", "").cast(DecimalType(15, 2))) \
-        .withColumn("currency", F.upper(F.trim("currency"))) \
-        .withColumn("booking_status",
-            F.when(F.upper("booking_status").isin("CONFIRMED", "CONFIRM", "1"), "CONFIRMED")
-             .when(F.upper("booking_status").isin("CANCELLED", "CANCEL"), "CANCELLED")
-             .when(F.upper("booking_status") == "PENDING", "PENDING")
-             .when(F.upper("booking_status") == "NO_SHOW", "NO_SHOW")
-             .otherwise(F.upper(F.trim("booking_status")))) \
-        .withColumn("booking_channel",
-            F.when(F.lower(F.col("source_channel")).isin("app_ios", "app_android"), "Mobile App")
-             .when(F.lower(F.col("source_channel")).isin("web", "website"), "Web")
-             .when(F.lower(F.col("source_channel")).startswith("partner"), "Partner API")
-             .otherwise(F.col("source_channel"))) \
-        .withColumn("payment_method", F.upper(F.trim("payment_method"))) \
-        .withColumn("nights",
-            F.datediff(F.col("checkout_date"), F.col("checkin_date")).cast(IntegerType())) \
-        .withColumn("created_at",
-            F.to_timestamp("created_at", "yyyy-MM-dd HH:mm:ss")) \
-        .withColumn("_ingested_at", F.current_timestamp()) \
-        .withColumn("_batch_date", F.lit(date_str).cast("date")) \
-        .drop("source_channel")
-
-    df_clean.write \
-        .format("jdbc") \
-        .option("url", CH_JDBC_URL) \
-        .option("dbtable", "bookings") \
-        .options(**CH_PROPS) \
-        .mode("append") \
-        .save()
-
-    count = df_clean.count()
-    log.info(f"   ✅ Loaded {count} rows to staging.bookings")
-    return count
+    log.info(f"   ✅ {entity}: {n_silver} rows silver → staging.{entity} (reconciled)")
+    return {"silver_rows": n_silver, "staging_rows": n_ch}
 
 
-def load_customers(spark, raw_path, date_str):
-    """Load customers from CSV with PII masking (SHA-256) and type casting."""
-    log.info("📂 Loading customers (CSV) → staging.customers")
-    path = f"{raw_path}/customers/dt={date_str}/*.csv"
+def run(date_str):
+    log.info(f"🚀 LOAD SILVER → CLICKHOUSE START [{date_str}]")
+    spark = create_spark("TravelHub_Load_ClickHouse")
+    client = ch_client()
 
-    df = spark.read \
-        .option("header", "true") \
-        .option("encoding", "UTF-8") \
-        .csv(path) \
-        .withColumn("_source_file", F.input_file_name()) \
-        .withColumn("_ingested_at", F.current_timestamp()) \
-        .withColumn("_batch_date", F.lit(date_str).cast("date"))
-
-    df_clean = df \
-        .withColumn("user_id", F.trim("user_id")) \
-        .withColumn("email_hash", F.sha2(F.trim("email"), 256)) \
-        .withColumn("phone_hash", F.sha2(F.trim("phone"), 256)) \
-        .withColumn("country", F.upper(F.trim("country"))) \
-        .withColumn("user_segment", F.lower(F.trim("user_segment"))) \
-        .withColumn("loyalty_tier", F.initcap(F.trim("loyalty_tier"))) \
-        .withColumn("loyalty_points", F.col("loyalty_points").cast(IntegerType())) \
-        .withColumn("first_booking_date", F.to_date("first_booking_date", "yyyy-MM-dd")) \
-        .withColumn("total_bookings", F.col("total_bookings").cast(IntegerType())) \
-        .withColumn("is_active",
-            F.when(F.lower("is_active") == "true", F.lit(True)).otherwise(F.lit(False))) \
-        .withColumn("registered_at", F.to_date("registered_at", "yyyy-MM-dd")) \
-        .drop("full_name", "email", "phone")
-
-    df_clean.write \
-        .format("jdbc") \
-        .option("url", CH_JDBC_URL) \
-        .option("dbtable", "customers") \
-        .options(**CH_PROPS) \
-        .mode("append") \
-        .save()
-
-    count = df_clean.count()
-    log.info(f"   ✅ Loaded {count} rows to staging.customers")
-    return count
-
-
-def load_hotels(spark, raw_path, date_str):
-    """Load hotels from XML to staging.hotels."""
-    log.info("📂 Loading hotels (XML) → staging.hotels")
-    path = f"{raw_path}/hotels/dt={date_str}/*.xml"
-
-    df = spark.read \
-        .format("com.databricks.spark.xml") \
-        .option("rowTag", "hotel") \
-        .option("encoding", "UTF-8") \
-        .load(path) \
-        .withColumn("star_rating", F.col("star_rating").cast(IntegerType())) \
-        .withColumn("latitude", F.col("latitude").cast("double")) \
-        .withColumn("longitude", F.col("longitude").cast("double")) \
-        .withColumn("total_rooms", F.col("total_rooms").cast(IntegerType())) \
-        .withColumn("partner_since", F.to_date("partner_since", "yyyy-MM-dd")) \
-        .withColumn("is_active",
-            F.when(F.lower("is_active") == "true", F.lit(True)).otherwise(F.lit(False))) \
-        .withColumn("_ingested_at", F.current_timestamp()) \
-        .withColumn("_source_file", F.input_file_name()) \
-        .withColumn("_batch_date", F.lit(date_str).cast("date"))
-
-    df.write \
-        .format("jdbc") \
-        .option("url", CH_JDBC_URL) \
-        .option("dbtable", "hotels") \
-        .options(**CH_PROPS) \
-        .mode("append") \
-        .save()
-
-    count = df.count()
-    log.info(f"   ✅ Loaded {count} rows to staging.hotels")
-    return count
-
-
-def load_payments(spark, raw_path, date_str):
-    """Load payments from CSV to staging.payments."""
-    log.info("📂 Loading payments (CSV) → staging.payments")
-    path = f"{raw_path}/payments/dt={date_str}/*.csv"
-
-    df = spark.read \
-        .option("header", "true") \
-        .option("encoding", "UTF-8") \
-        .csv(path) \
-        .withColumn("amount",
-            F.regexp_replace("amount", "[^0-9.]", "").cast(DecimalType(15, 2))) \
-        .withColumn("processed_at",
-            F.to_timestamp("processed_at", "yyyy-MM-dd HH:mm:ss")) \
-        .withColumn("refund_amount",
-            F.when(F.col("refund_amount").isNull() | (F.col("refund_amount") == ""), F.lit(0))
-             .otherwise(F.regexp_replace("refund_amount", "[^0-9.]", "").cast(DecimalType(15, 2)))) \
-        .withColumn("refund_at",
-            F.when((F.col("refund_at").isNull()) | (F.col("refund_at") == ""), F.lit(None).cast(TimestampType()))
-             .otherwise(F.to_timestamp("refund_at", "yyyy-MM-dd HH:mm:ss"))) \
-        .withColumn("_ingested_at", F.current_timestamp()) \
-        .withColumn("_source_file", F.input_file_name()) \
-        .withColumn("_batch_date", F.lit(date_str).cast("date"))
-
-    df.write \
-        .format("jdbc") \
-        .option("url", CH_JDBC_URL) \
-        .option("dbtable", "payments") \
-        .options(**CH_PROPS) \
-        .mode("append") \
-        .save()
-
-    count = df.count()
-    log.info(f"   ✅ Loaded {count} rows to staging.payments")
-    return count
-
-
-def load_clickstream(spark, raw_path, date_str):
-    """Load clickstream from CSV to staging.clickstream."""
-    log.info("📂 Loading clickstream (CSV) → staging.clickstream")
-    path = f"{raw_path}/clickstream/dt={date_str}/*.csv"
-
-    df = spark.read \
-        .option("header", "true") \
-        .option("encoding", "UTF-8") \
-        .csv(path) \
-        .withColumn("event_timestamp",
-            F.to_timestamp("event_timestamp", "yyyy-MM-dd HH:mm:ss")) \
-        .withColumn("_ingested_at", F.current_timestamp()) \
-        .withColumn("_source_file", F.input_file_name()) \
-        .withColumn("_batch_date", F.lit(date_str).cast("date"))
-
-    df.write \
-        .format("jdbc") \
-        .option("url", CH_JDBC_URL) \
-        .option("dbtable", "clickstream") \
-        .options(**CH_PROPS) \
-        .mode("append") \
-        .save()
-
-    count = df.count()
-    log.info(f"   ✅ Loaded {count} rows to staging.clickstream")
-    return count
-
-
-def run(date_str, raw_path="/opt/sample-data/raw"):
-    log.info(f"🚀 LOAD TO CLICKHOUSE START [{date_str}]")
-    spark = create_spark()
-    results = {}
-
-    loaders = [
-        ("bookings",    lambda: load_bookings(spark, raw_path, date_str)),
-        ("hotels",      lambda: load_hotels(spark, raw_path, date_str)),
-        ("payments",    lambda: load_payments(spark, raw_path, date_str)),
-        ("customers",   lambda: load_customers(spark, raw_path, date_str)),
-        ("clickstream", lambda: load_clickstream(spark, raw_path, date_str)),
-    ]
-
-    for source, loader_fn in loaders:
+    results, failed = {}, []
+    for entity in STAGING_COLUMNS:
         try:
-            n = loader_fn()
-            results[source] = n
-        except Exception as e:
-            log.error(f"❌ {source} load failed: {e}")
-            results[source] = -1
+            results[entity] = load_entity(spark, client, entity, date_str)
+        except Exception as e:  # noqa: BLE001
+            log.error(f"❌ {entity} load failed: {e}")
+            results[entity] = {"error": str(e)[:300]}
+            failed.append(entity)
 
-    log.info(f"📊 LOAD RESULTS: {results}")
     spark.stop()
-    return results
+    total = sum(r.get("staging_rows", 0) for r in results.values())
+    emit_metrics("load", {"rows": total, "entities": results, "failed": failed})
+    log.info(f"📊 LOAD RESULTS: {results}")
+    return not failed
 
 
 if __name__ == "__main__":
-    date_arg = sys.argv[1] if len(sys.argv) > 1 else str(dt.today())
-    raw = sys.argv[2] if len(sys.argv) > 2 else "/opt/sample-data/raw"
-    run(date_arg, raw)
+    ok = run(parse_date_arg())
+    sys.exit(0 if ok else 1)

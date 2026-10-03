@@ -1,5 +1,7 @@
 -- ============================================================
 --  stg_hotels — Staging view for hotel master data
+--  Trả về TOÀN BỘ lịch sử snapshot (1 dòng / hotel / _batch_date)
+--  → nguồn cho dim_hotels (SCD Type 2)
 -- ============================================================
 
 {{
@@ -9,7 +11,7 @@
 }}
 
 SELECT
-    trim(hotel_id)                                AS hotel_id,
+    upper(trim(hotel_id))                         AS hotel_id,
     trim(hotel_name)                              AS hotel_name,
     lower(trim(hotel_tier))                       AS hotel_tier,
     toUInt8(star_rating)                          AS star_rating,
@@ -19,6 +21,10 @@ SELECT
     latitude,
     longitude,
     total_rooms,
+    -- "bar,beach,parking" → ['bar','beach','parking'] (sắp xếp để hash ổn định)
+    arraySort(arrayFilter(x -> x != '', splitByChar(',', lower(facilities))))
+                                                  AS facilities,
+    partner_since,
     is_active,
     _batch_date
 FROM {{ source('staging', 'hotels') }} FINAL

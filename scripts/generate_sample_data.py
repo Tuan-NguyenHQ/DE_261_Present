@@ -235,6 +235,7 @@ def generate_bookings(output_dir, hotels, customers):
             "hotel_id": hotel["hotel_id"],
             "user_id": customer["user_id"],
             "amount_clean": amount,
+            "created_at": created_at,
         })
 
         # Split into CSV and XML (70/30)

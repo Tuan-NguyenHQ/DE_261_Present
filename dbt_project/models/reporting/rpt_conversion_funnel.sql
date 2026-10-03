@@ -13,6 +13,7 @@ SELECT
     countIf(s.search_count > 0)                          AS sessions_with_search,
     countIf(s.hotels_viewed > 0)                         AS sessions_with_hotel_view,
     countIf(s.converted)                                 AS converted_sessions,
+    countIf(s.booking_id IS NOT NULL)                    AS attributed_sessions,
 
     -- Funnel rates
     ROUND(100.0 * countIf(s.search_count > 0)   / nullIf(count(*), 0), 2)
@@ -27,7 +28,7 @@ SELECT
     avg(s.page_views)                                    AS avg_page_views,
     avg(s.total_events)                                  AS avg_events_per_session
 
-FROM {{ ref('fact_web_sessions') }} s
-WHERE s._batch_date = '{{ var("execution_date") }}'
+-- Build lại toàn bộ lịch sử (giữ chuỗi ngày thay vì chỉ ngày chạy gần nhất)
+FROM {{ ref('fact_web_sessions') }} AS s FINAL
 GROUP BY 1, 2
-ORDER BY total_sessions DESC
+ORDER BY report_date, total_sessions DESC

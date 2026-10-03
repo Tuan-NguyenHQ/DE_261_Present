@@ -14,6 +14,8 @@ travelhub:
       password: "{{ env_var('CLICKHOUSE_PASSWORD', 'clickhouse_secret_2026') }}"
       secure: false
       verify: false
+      custom_settings:
+        join_use_nulls: 1     # LEFT JOIN không khớp → NULL (mặc định ClickHouse trả 0/'' làm test not_null/relationships vô nghĩa)
 
     prod:
       type: clickhouse
@@ -24,3 +26,5 @@ travelhub:
       password: "{{ env_var('CLICKHOUSE_PASSWORD', 'clickhouse_secret_2026') }}"
       secure: false
       verify: false
+      custom_settings:
+        join_use_nulls: 1     # LEFT JOIN không khớp → NULL (mặc định ClickHouse trả 0/'' làm test not_null/relationships vô nghĩa)

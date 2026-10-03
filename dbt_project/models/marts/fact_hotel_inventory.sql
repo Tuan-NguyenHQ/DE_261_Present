@@ -1,45 +1,67 @@
 -- ============================================================
---  fact_hotel_inventory — Hotel room inventory fact
---  Grain: 1 row = hotel × ngày × loại phòng
+--  fact_hotel_inventory — Grain: hotel × stay night × room_type
+--  - Mỗi booking CONFIRMED được bung thành từng đêm lưu trú (checkin .. checkout-1)
+--  - Build lại toàn bộ (table): một đêm lưu trú nhận booking từ nhiều batch khác nhau,
+--    nên incremental theo _batch_date sẽ ghi đè mất số đã đặt từ các ngày trước
+--  - ADR / RevPAR tính bằng USD (tỷ giá seed fx_rates) thay vì cộng lẫn tiền tệ
+--  - Capacity: version dim_hotels hiệu lực tại đêm lưu trú (ASOF)
 -- ============================================================
 
 {{
   config(
-    materialized='incremental',
-    unique_key='(hotel_sk, date_id, room_type)',
-    incremental_strategy='delete+insert',
-    order_by='(hotel_sk, date_id, room_type)',
-    on_schema_change='append_new_columns'
+    materialized='table',
+    engine='MergeTree()',
+    order_by='(hotel_sk, date_id, room_type)'
   )
 }}
 
-WITH booking_counts AS (
+WITH confirmed AS (
+    SELECT
+        b.hotel_id,
+        b.room_type,
+        b.checkin_date,
+        greatest(b.nights, 1)                                        AS nights,
+        {{ to_usd('b.total_amount', 'fx.units_per_usd') }}           AS amount_usd
+    FROM {{ ref('stg_bookings') }} b
+    ASOF LEFT JOIN {{ ref('fx_rates') }} fx
+        ON b.currency = fx.currency AND b._batch_date >= fx.valid_from
+    WHERE b.booking_status = 'CONFIRMED'
+),
+
+nightly AS (
     SELECT
         hotel_id,
         room_type,
-        checkin_date                                     AS stay_date,
-        count(*)                                         AS booked_rooms,
-        avg(total_amount / greatest(nights, 1))          AS adr
-    FROM {{ ref('stg_bookings') }}
-    WHERE booking_status = 'CONFIRMED'
-    {% if is_incremental() %}
-      AND _batch_date = '{{ var("execution_date") }}'
-    {% endif %}
-    GROUP BY hotel_id, room_type, checkin_date
+        addDays(checkin_date, arrayJoin(range(toUInt32(nights))))    AS stay_date,
+        amount_usd / nights                                          AS night_rate_usd
+    FROM confirmed
+),
+
+agg AS (
+    SELECT
+        hotel_id,
+        room_type,
+        stay_date,
+        count()                                                      AS booked_rooms,
+        avgIf(night_rate_usd, night_rate_usd IS NOT NULL)            AS adr_usd
+    FROM nightly
+    GROUP BY hotel_id, room_type, stay_date
 )
 
 SELECT
-    h.hotel_sk,
-    toUInt32(formatDateTime(bc.stay_date, '%Y%m%d'))      AS date_id,
-    bc.room_type,
-    toUInt16(h.total_rooms)                               AS total_rooms,
-    toUInt16(bc.booked_rooms)                             AS booked_rooms,
-    toUInt16(greatest(h.total_rooms - bc.booked_rooms, 0)) AS available_rooms,
-    ROUND(bc.booked_rooms * 100.0 / greatest(h.total_rooms, 1), 2) AS occupancy_rate,
-    ROUND(bc.adr, 2)                                      AS adr,
-    ROUND(bc.adr * bc.booked_rooms / greatest(h.total_rooms, 1), 2) AS revpar,
-    bc.stay_date                                          AS _batch_date
-
-FROM booking_counts bc
-LEFT JOIN {{ ref('dim_hotels') }} h ON bc.hotel_id = h.hotel_id AND h.is_current
-WHERE h.hotel_sk IS NOT NULL
+    ifNull(h.hotel_sk, toUInt64(0))                                  AS hotel_sk,
+    toUInt32(formatDateTime(a.stay_date, '%Y%m%d'))                  AS date_id,
+    CAST(a.room_type AS LowCardinality(String))                      AS room_type,
+    toUInt16(ifNull(h.total_rooms, 0))                               AS total_rooms,
+    toUInt16(a.booked_rooms)                                         AS booked_rooms,
+    toUInt16(greatest(toInt64(ifNull(h.total_rooms, 0)) - toInt64(a.booked_rooms), 0))
+                                                                     AS available_rooms,
+    toFloat32(round(a.booked_rooms * 100.0 / greatest(ifNull(h.total_rooms, 0), 1), 2))
+                                                                     AS occupancy_rate,
+    toDecimal64(round(a.adr_usd, 2), 2)                              AS adr_usd,
+    toDecimal64(round(a.adr_usd * a.booked_rooms / greatest(ifNull(h.total_rooms, 0), 1), 2), 2)
+                                                                     AS revpar_usd,
+    a.stay_date                                                      AS stay_date
+FROM agg a
+ASOF LEFT JOIN {{ ref('dim_hotels') }} h
+    ON a.hotel_id = h.hotel_id AND a.stay_date >= h.valid_from

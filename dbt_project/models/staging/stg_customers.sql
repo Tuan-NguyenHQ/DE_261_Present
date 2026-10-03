@@ -9,7 +9,7 @@
 }}
 
 SELECT
-    trim(user_id)                                 AS user_id,
+    upper(trim(user_id))                          AS user_id,
     email_hash,
     phone_hash,
     upper(trim(country))                          AS country,
