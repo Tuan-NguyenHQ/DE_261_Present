@@ -148,12 +148,29 @@ services:
   superset:
     image: apache/superset:3.1.0
     container_name: travelhub-superset
+    user: "root"
     ports:
       - "8088:8088"
     environment:
       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET:-superset_secret_key_2026}
       ADMIN_USERNAME: admin
       ADMIN_PASSWORD: admin
+    volumes:
+      - superset_home:/app/superset_home
+    command:
+      - /bin/sh
+      - -c
+      - |
+        pip install --no-cache-dir clickhouse-connect
+        if [ ! -f /app/superset_home/.initialized ]; then
+          echo "Initializing Superset database & admin..."
+          superset db upgrade
+          superset fab create-admin --username admin --firstname Superset --lastname Admin --email admin@superset.com --password admin
+          superset init
+          touch /app/superset_home/.initialized
+          echo "Superset initialized successfully!"
+        fi
+        /usr/bin/run-server.sh
     depends_on:
       clickhouse:
         condition: service_healthy
@@ -178,6 +195,7 @@ volumes:
   clickhouse_data:
   grafana_data:
   pipeline_logs:
+  superset_home:
 
 networks:
   travelhub-net:
