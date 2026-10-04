@@ -280,7 +280,14 @@ if __name__ == "__main__":
     parser.add_argument("date", nargs="?", default=str(dt.today()), help="YYYY-MM-DD")
     parser.add_argument("--skip-generate", action="store_true")
     parser.add_argument("--from-step", choices=[n for n, _ in STEPS])
+    parser.add_argument("--dq-max-reject-ratio", type=float, default=None,
+                        help="Ngưỡng tỷ lệ lỗi tối đa cho circuit breaker (mặc định 0.2)")
     args = parser.parse_args()
     datetime.strptime(args.date, "%Y-%m-%d")
+
+    if args.dq_max_reject_ratio is not None:
+        os.environ["DQ_MAX_REJECT_RATIO"] = str(args.dq_max_reject_ratio)
+    elif args.skip_generate:
+        os.environ.setdefault("DQ_MAX_REJECT_RATIO", "0.5")
 
     sys.exit(0 if run(args.date, args.skip_generate, args.from_step) else 1)

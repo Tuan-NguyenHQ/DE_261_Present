@@ -34,3 +34,4 @@ Thumbs.db
 # Secrets (keep .env.example, ignore .env)
 # .env
 !dbt_project/seeds/*.csv
+!data/sample_showcase
