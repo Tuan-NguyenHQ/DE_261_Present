@@ -36,3 +36,4 @@ Thumbs.db
 !dbt_project/seeds/*.csv
 !data/sample_showcase/raw/*.csv
 !data/sample_showcase/raw/*.xml
+sample_showcase_description.md
