@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bookings>
+  <booking>
+    <booking_id>BK-DEMO-005</booking_id>
+    <hotel_id>HTL-002</hotel_id>
+    <user_id>USR-002</user_id>
+    <room_type>Deluxe</room_type>
+    <checkin_date>2026-09-12</checkin_date>
+    <checkout_date>2026-09-15</checkout_date>
+    <total_amount>72,000 THB</total_amount>
+    <currency>THB</currency>
+    <booking_status>1</booking_status>
+    <source_channel>partner_ota_agoda</source_channel>
+    <payment_method>CREDIT_CARD</payment_method>
+    <created_at>2026-08-10 10:20:00</created_at>
+  </booking>
+  <booking>
+    <booking_id>BK-DEMO-006</booking_id>
+    <hotel_id>HTL-001</hotel_id>
+    <user_id>USR-001</user_id>
+    <room_type>Deluxe</room_type>
+    <checkin_date>2026-09-20</checkin_date>
+    <checkout_date>2026-09-22</checkout_date>
+    <total_amount>$500.00</total_amount>
+    <currency>USD</currency>
+    <booking_status>CANCELLED</booking_status>
+    <source_channel>web</source_channel>
+    <payment_method>BANK_TRANSFER</payment_method>
+    <created_at>2026-08-12 15:40:00</created_at>
+  </booking>
+  <booking>
+    <booking_id>BK-DEMO-007</booking_id>
+    <hotel_id>HTL-003</hotel_id>
+    <user_id>USR-003</user_id>
+    <room_type>Executive</room_type>
+    <checkin_date>2026-09-25</checkin_date>
+    <checkout_date>2026-09-28</checkout_date>
+    <total_amount>1,340 SGD</total_amount>
+    <currency>SGD</currency>
+    <booking_status>CONFIRMED</booking_status>
+    <source_channel>mobile app</source_channel>
+    <payment_method>EWALLET</payment_method>
+    <created_at>2026-08-15 09:10:00</created_at>
+  </booking>
+  <booking>
+    <booking_id>BK-DEMO-008</booking_id>
+    <hotel_id>HTL-003</hotel_id>
+    <user_id>USR-003</user_id>
+    <room_type>Standard</room_type>
+    <checkin_date>2026-09-28</checkin_date>
+    <checkout_date>2026-09-30</checkout_date>
+    <total_amount>FREE_PROMO_VOUCHER</total_amount>
+    <currency>USD</currency>
+    <booking_status>CONFIRMED</booking_status>
+    <source_channel>web</source_channel>
+    <payment_method>CREDIT_CARD</payment_method>
+    <created_at>2026-08-18 11:30:00</created_at>
+  </booking>
+</bookings>

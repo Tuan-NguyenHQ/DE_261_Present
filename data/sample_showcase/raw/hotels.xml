@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<hotels>
+  <hotel>
+    <hotel_id>HTL-001</hotel_id>
+    <hotel_name>Da Nang Luxury Beach Resort</hotel_name>
+    <hotel_tier>luxury</hotel_tier>
+    <star_rating>5</star_rating>
+    <city>Da Nang</city>
+    <country>VN</country>
+    <region>Central</region>
+    <latitude>16.0544</latitude>
+    <longitude>108.2022</longitude>
+    <total_rooms>150</total_rooms>
+    <facilities>['pool', 'spa', 'wifi', 'beach', 'restaurant']</facilities>
+    <partner_since>2022-01-15</partner_since>
+    <is_active>true</is_active>
+  </hotel>
+  <hotel>
+    <hotel_id>HTL-002</hotel_id>
+    <hotel_name>Bangkok Riverside Hotel</hotel_name>
+    <hotel_tier>boutique</hotel_tier>
+    <star_rating>4</star_rating>
+    <city>Bangkok</city>
+    <country>TH</country>
+    <region>Central</region>
+    <latitude>13.7563</latitude>
+    <longitude>100.5018</longitude>
+    <total_rooms>80</total_rooms>
+    <facilities>['wifi', 'bar', 'pool']</facilities>
+    <partner_since>2021-06-10</partner_since>
+    <is_active>1</is_active>
+  </hotel>
+  <hotel>
+    <hotel_id>HTL-003</hotel_id>
+    <hotel_name>Singapore Grand Central</hotel_name>
+    <hotel_tier>luxury</hotel_tier>
+    <star_rating>5</star_rating>
+    <city>Singapore</city>
+    <country>SG</country>
+    <region>Central</region>
+    <latitude>1.3521</latitude>
+    <longitude>103.8198</longitude>
+    <total_rooms>220</total_rooms>
+    <facilities>['gym', 'wifi', 'conference', 'restaurant']</facilities>
+    <partner_since>2020-03-01</partner_since>
+    <is_active>yes</is_active>
+  </hotel>
+  <hotel>
+    <hotel_id>HTL-004</hotel_id>
+    <hotel_name>Invalid Star Hotel</hotel_name>
+    <hotel_tier>budget</hotel_tier>
+    <star_rating>7</star_rating>
+    <city>Hanoi</city>
+    <country>VN</country>
+    <region>North</region>
+    <latitude>21.0285</latitude>
+    <longitude>105.8542</longitude>
+    <total_rooms>50</total_rooms>
+    <facilities>['wifi']</facilities>
+    <partner_since>2024-01-01</partner_since>
+    <is_active>true</is_active>
+  </hotel>
+  <hotel>
+    <hotel_id>HTL-005</hotel_id>
+    <hotel_name>Negative Room Hotel</hotel_name>
+    <hotel_tier>standard</hotel_tier>
+    <star_rating>3</star_rating>
+    <city>Phuket</city>
+    <country>TH</country>
+    <region>South</region>
+    <latitude>7.8804</latitude>
+    <longitude>98.3923</longitude>
+    <total_rooms>-15</total_rooms>
+    <facilities>['pool']</facilities>
+    <partner_since>2023-05-12</partner_since>
+    <is_active>false</is_active>
+  </hotel>
+</hotels>

@@ -1,0 +1,6 @@
+user_id,full_name,email,phone,country,user_segment,loyalty_tier,loyalty_points,first_booking_date,total_bookings,is_active,registered_at
+USR-001,Alice Nguyen,alice.nguyen@traveler.vn,+84-901-234-567,VN,premium,Platinum,15200,2023-01-10,12,true,2022-12-01
+USR-002,Somchai Prasert,somchai.p@thai-traveler.th,+66 81 234 5678,TH,standard,Gold,8400,2024-02-15,6,1,2023-11-20
+USR-003,David Tan,david.tan@sgmail.sg,+65 9123 4567,SG,vip,Diamond,32000,2022-05-20,25,yes,2021-08-14
+USR-004,Bob Blank Email,,+84912345678,VN,budget,Bronze,500,2026-01-05,1,true,2025-12-28
+USR-005,Charlie No Phone,charlie.np@sample.org,,TH,standard,Silver,2100,2025-08-10,3,true,2025-06-15

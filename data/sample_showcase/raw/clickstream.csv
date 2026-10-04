@@ -1,0 +1,6 @@
+event_id,session_id,user_id,event_type,page_url,hotel_id,search_query,device_type,os,event_timestamp
+EVT-001,SES-001,USR-001,page_view,https://travelhub.com/hotels/HTL-001,HTL-001,,mobile,Android,2026-05-01 08:15:00
+EVT-002,SES-001,USR-001,booking_submit,https://travelhub.com/checkout,HTL-001,,mobile,Android,2026-05-01 08:30:00
+EVT-003,SES-002,USR-002,search,https://travelhub.com/search,HTL-002,Bangkok luxury hotel,desktop,Windows,2026-08-20 08:50:00
+EVT-004,SES-002,USR-002,booking_submit,https://travelhub.com/checkout,HTL-002,,desktop,Windows,2026-08-20 09:00:00
+EVT-005,SES-003,USR-003,page_view,https://travelhub.com/hotels/HTL-003,HTL-003,,tablet,iOS,2026-08-15 09:05:00
