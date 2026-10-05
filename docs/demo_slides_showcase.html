@@ -531,8 +531,8 @@
       <div class="tag" style="background:var(--accent);width:max-content;margin-bottom:14px;font-size:13px">SAMPLE
         SHOWCASE · DATA ENGINEERING</div>
       <h1>TravelHub Data Platform<br>Minh Họa Pipeline &amp; Bộ Dữ Liệu Kiểm Thử</h1>
-      <p class="sub" style="font-size:20px">Phân tích toàn diện 26 ca kiểm thử thực tế: Đa định dạng CSV+XML, Làm sạch,
-        Dedup, Băm PII, ASOF FX &amp; Star Schema</p>
+      <!-- <p class="sub" style="font-size:20px">Phân tích toàn diện 26 ca kiểm thử thực tế: Đa định dạng CSV+XML, Làm sạch, -->
+      <!-- Dedup, Băm PII, ASOF FX &amp; Star Schema</p> -->
       <div class="pill-row">
         <span class="pill" style="background:#475569">Sample Showcase</span>
         <span class="pill" style="background:var(--ok)">SeaweedFS</span>
@@ -541,13 +541,73 @@
         <span class="pill" style="background:var(--dbt)">dbt</span>
         <span class="pill" style="background:#20a7c9">Superset BI</span>
       </div>
-      <div class="meta">Bộ dữ liệu: <code>data/sample_showcase/</code> · Môn: Data Engineering · HK1</div>
+      <div class="meta"> · Môn: Data Engineering · </div>
     </section>
 
-    <!-- 2. REQUIREMENTS -->
+    <!-- 2. ARCHITECTURE -->
+    <section class="slide">
+      <h2>Kiến trúc Pipeline</h2>
+      <!-- <p class="sub" style="margin-bottom:8px">Quy trình xử lý khép kín từ File Thô &rarr; Data Lake &rarr; Data
+        Warehouse &rarr; Marts</p> -->
+      <div class="arch-wrap">
+        <div class="arch">
+          <div class="zone" style="width:170px">
+            <div class="zt">Nguồn (Sample Showcase)</div>
+            <div class="box" style="background:#334155">Bookings<small>6 CSV + 4 XML</small></div>
+            <div class="box" style="background:#334155">Hotels<small>5 XML</small></div>
+            <div class="box" style="background:#334155">Customers<small>5 CSV (PII)</small></div>
+            <div class="box" style="background:#334155">Payments<small>6 CSV (Refund)</small></div>
+            <div class="box" style="background:#334155">Clickstream<small>5 CSV</small></div>
+          </div>
+          <div class="arrow">➜</div>
+          <div class="zone" style="flex:1.35;border-color:#94a3b8">
+            <div class="zt">Data Lake · SeaweedFS (S3)</div>
+            <div class="box" style="background:var(--raw)">raw/ <small>File gốc bất biến · upload bằng boto3</small>
+            </div>
+            <div class="center"><span class="spark-tag">▼ Spark: <code>ingest_bronze.py</code></span></div>
+            <div class="side">
+              <div class="box" style="background:var(--bronze)">bronze/ <small>Parquet · all-string + metadata</small>
+              </div>
+              <div class="box" style="background:var(--rejected);flex:.65">rejected/ <small>Malformed JSON</small></div>
+            </div>
+            <div class="center"><span class="spark-tag">▼ Spark: <code>cleanse_silver.py</code></span></div>
+            <div class="side">
+              <div class="box" style="background:var(--silver)">silver/ <small>Typed, Dedup, Hash PII</small></div>
+              <div class="box" style="background:var(--quar);flex:.75">quarantine/ <small>Vi phạm DQ +
+                  _dq_reason</small></div>
+            </div>
+          </div>
+          <div class="arrow" style="flex-direction:column;font-size:13px;gap:4px"><span
+              style="font-size:28px">➜</span><span style="line-height:1.2;text-align:center">Spark<br>JDBC</span></div>
+          <div class="zone" style="flex:1.25;border-color:var(--ch)">
+            <div class="zt">Data Warehouse · ClickHouse</div>
+            <div class="box" style="background:#d97706">staging.* <small>ReplacingMergeTree · đối soát số dòng</small>
+            </div>
+            <div class="center"><span class="spark-tag">▼ dbt run</span></div>
+            <div class="box" style="background:var(--dbt)">stg_* views <small>Chuẩn hoá view, FINAL dedup</small></div>
+            <div class="side">
+              <div class="box" style="background:var(--gold)">dim_* <small>Dimensions chuẩn</small></div>
+              <div class="box" style="background:var(--gold)">fact_* <small>Facts + ASOF FX</small></div>
+            </div>
+            <div class="box" style="background:#a16207">rpt_* <small>Báo cáo doanh thu &amp; hiệu suất</small></div>
+          </div>
+          <div class="arrow">➜</div>
+          <div class="zone" style="width:165px">
+            <div class="zt">Phục vụ &amp; BI</div>
+            <div class="box" style="background:#20a7c9">Superset<small>Dashboard phân tích</small></div>
+            <div class="box" style="background:#475569">pipeline_runs<small>Audit log chi tiết</small></div>
+            <div class="box" style="background:var(--ok)">dbt test<small>Kiểm tra tự động</small></div>
+            <div class="box" style="background:#0f766e">Ad-hoc SQL<small>Truy vấn trực tiếp</small></div>
+          </div>
+        </div>
+      </div>
+      <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
+    </section>
+
+    <!-- 3. REQUIREMENTS -->
     <section class="slide">
       <h2>Bối cảnh &amp; Yêu cầu xử lý (Sample Showcase)</h2>
-      <p class="sub">Tập trung giải quyết triệt để 5 vấn đề cốt lõi của kỹ thuật dữ liệu</p>
+      <!-- <p class="sub">Tập trung giải quyết triệt để 5 vấn đề cốt lõi của kỹ thuật dữ liệu</p> -->
       <div class="grid2">
         <div class="card">
           <h3>📌 5 Bài toán dữ liệu đầu vào</h3>
@@ -606,10 +666,10 @@
       <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
     </section>
 
-    <!-- 3. GOALS -->
+    <!-- 4. GOALS -->
     <section class="slide">
       <h2>Mục tiêu &amp; Quy mô kiểm thử</h2>
-      <p class="sub">Tập dữ liệu tinh gọn (~10 dòng/bảng) được thiết kế có chủ đích cho từng tình huống kiểm thử</p>
+      <!-- <p class="sub">Tập dữ liệu tinh gọn (~10 dòng/bảng) được thiết kế có chủ đích cho từng tình huống kiểm thử</p> -->
       <div class="grid3" style="margin-bottom:14px">
         <div class="card">
           <h3>🗄️ 1. Lưu trữ bất biến</h3>
@@ -652,70 +712,10 @@
       <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
     </section>
 
-    <!-- 4. ARCHITECTURE -->
-    <section class="slide">
-      <h2>Kiến trúc Pipeline</h2>
-      <p class="sub" style="margin-bottom:8px">Quy trình xử lý khép kín từ File Thô &rarr; Data Lake &rarr; Data
-        Warehouse &rarr; Marts</p>
-      <div class="arch-wrap">
-        <div class="arch">
-          <div class="zone" style="width:170px">
-            <div class="zt">Nguồn (Sample Showcase)</div>
-            <div class="box" style="background:#334155">Bookings<small>6 CSV + 4 XML</small></div>
-            <div class="box" style="background:#334155">Hotels<small>5 XML</small></div>
-            <div class="box" style="background:#334155">Customers<small>5 CSV (PII)</small></div>
-            <div class="box" style="background:#334155">Payments<small>6 CSV (Refund)</small></div>
-            <div class="box" style="background:#334155">Clickstream<small>5 CSV</small></div>
-          </div>
-          <div class="arrow">➜</div>
-          <div class="zone" style="flex:1.35;border-color:#94a3b8">
-            <div class="zt">Data Lake · SeaweedFS (S3)</div>
-            <div class="box" style="background:var(--raw)">raw/ <small>File gốc bất biến · upload bằng boto3</small>
-            </div>
-            <div class="center"><span class="spark-tag">▼ Spark: <code>ingest_bronze.py</code></span></div>
-            <div class="side">
-              <div class="box" style="background:var(--bronze)">bronze/ <small>Parquet · all-string + metadata</small>
-              </div>
-              <div class="box" style="background:var(--rejected);flex:.65">rejected/ <small>Malformed JSON</small></div>
-            </div>
-            <div class="center"><span class="spark-tag">▼ Spark: <code>cleanse_silver.py</code></span></div>
-            <div class="side">
-              <div class="box" style="background:var(--silver)">silver/ <small>Typed, Dedup, Hash PII</small></div>
-              <div class="box" style="background:var(--quar);flex:.75">quarantine/ <small>Vi phạm DQ +
-                  _dq_reason</small></div>
-            </div>
-          </div>
-          <div class="arrow" style="flex-direction:column;font-size:13px;gap:4px"><span
-              style="font-size:28px">➜</span><span style="line-height:1.2;text-align:center">Spark<br>JDBC</span></div>
-          <div class="zone" style="flex:1.25;border-color:var(--ch)">
-            <div class="zt">Data Warehouse · ClickHouse</div>
-            <div class="box" style="background:#d97706">staging.* <small>ReplacingMergeTree · đối soát số dòng</small>
-            </div>
-            <div class="center"><span class="spark-tag">▼ dbt run</span></div>
-            <div class="box" style="background:var(--dbt)">stg_* views <small>Chuẩn hoá view, FINAL dedup</small></div>
-            <div class="side">
-              <div class="box" style="background:var(--gold)">dim_* <small>Dimensions chuẩn</small></div>
-              <div class="box" style="background:var(--gold)">fact_* <small>Facts + ASOF FX</small></div>
-            </div>
-            <div class="box" style="background:#a16207">rpt_* <small>Báo cáo doanh thu &amp; hiệu suất</small></div>
-          </div>
-          <div class="arrow">➜</div>
-          <div class="zone" style="width:165px">
-            <div class="zt">Phục vụ &amp; BI</div>
-            <div class="box" style="background:#20a7c9">Superset<small>Dashboard phân tích</small></div>
-            <div class="box" style="background:#475569">pipeline_runs<small>Audit log chi tiết</small></div>
-            <div class="box" style="background:var(--ok)">dbt test<small>Kiểm tra tự động</small></div>
-            <div class="box" style="background:#0f766e">Ad-hoc SQL<small>Truy vấn trực tiếp</small></div>
-          </div>
-        </div>
-      </div>
-      <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
-    </section>
-
     <!-- 5. ORCHESTRATION -->
     <section class="slide">
       <h2>Điều phối tự động 8 bước</h2>
-      <p class="sub">Thực thi toàn diện qua lệnh duy nhất: <code>python3 run_pipeline.py 2026-10-01</code></p>
+      <!-- <p class="sub">Thực thi toàn diện qua lệnh duy nhất: <code>python3 run_pipeline.py 2026-10-01</code></p> -->
       <div class="steps">
         <div class="step" style="background:#334155"><b>0</b>generate<br><span style="font-weight:400">copy
             sample</span></div>
@@ -761,7 +761,7 @@
     <!-- 6. DATASET OVERVIEW -->
     <section class="slide">
       <h2>Tổng quan tập dữ liệu <code>sample_showcase</code></h2>
-      <p class="sub">Tất cả file được lưu trữ tại <code>data/sample_showcase/</code></p>
+      <!-- <p class="sub">Tất cả file được lưu trữ tại <code>data/sample_showcase/</code></p> -->
       <table class="table-compact">
         <tr>
           <th>Tên file nguồn</th>
