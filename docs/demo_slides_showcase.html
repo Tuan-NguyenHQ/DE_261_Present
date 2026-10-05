@@ -1,706 +1,1959 @@
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TravelHub — Pipeline Showcase (Sample Data · Non-SCD2)</title>
-<style>
-  :root{
-    --bg:#0f172a; --ink:#0f172a; --muted:#64748b; --line:#e2e8f0; --card:#f8fafc;
-    --accent:#2563eb; --accent2:#0ea5e9;
-    --raw:#64748b; --bronze:#b45309; --rejected:#dc2626; --silver:#475569; --quar:#ea580c;
-    --gold:#ca8a04; --ch:#f59e0b; --dbt:#ff694b; --ok:#16a34a;
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%;background:var(--bg);font-family:"Segoe UI",Roboto,-apple-system,BlinkMacSystemFont,sans-serif;color:var(--ink)}
-  #deck{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
-  .slide{position:absolute;width:1280px;height:720px;background:#fff;border-radius:10px;
-         padding:44px 56px 50px;display:none;flex-direction:column;overflow:hidden;
-         transform-origin:center center;box-shadow:0 20px 60px rgba(0,0,0,.4)}
-  .slide.active{display:flex}
-  .slide::before{content:"";position:absolute;left:0;top:0;right:0;height:6px;
-         background:linear-gradient(90deg,var(--raw),var(--bronze),var(--silver),var(--gold),var(--accent))}
-  .foot{position:absolute;left:56px;right:56px;bottom:16px;display:flex;justify-content:space-between;
-        font-size:12.5px;color:var(--muted)}
-  h1{font-size:42px;line-height:1.18;margin-bottom:10px;font-weight:700}
-  h2{font-size:30px;margin-bottom:4px;font-weight:700}
-  .sub{color:var(--muted);font-size:16.5px;margin-bottom:18px}
-  h3{font-size:17.5px;margin-bottom:6px;font-weight:600}
-  p,li{font-size:16.5px;line-height:1.45}
-  ul{padding-left:20px} li{margin:3px 0}
-  .small li,.small p{font-size:14px;line-height:1.4}
-  code,.mono{font-family:Consolas,"Courier New",monospace;font-size:.88em;background:#f1f5f9;padding:1px 5px;border-radius:4px}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px;flex:1}
-  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:14px 16px}
-  .card h3{display:flex;align-items:center;gap:7px}
-  .tag{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 7px;border-radius:999px;color:#fff;vertical-align:middle;text-transform:uppercase}
-  table{border-collapse:collapse;width:100%;font-size:13.5px}
-  th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
-  th{background:#f1f5f9;font-weight:600;color:#334155}
-  td code{font-size:12px}
-  .table-compact th,.table-compact td{padding:4.5px 6px;font-size:12.5px}
-  .muted{color:var(--muted)}
-  .center{text-align:center}
-  /* title slide */
-  .title{justify-content:center;background:radial-gradient(circle at 85% 20%,#dbeafe 0,#fff 45%)}
-  .title .meta{margin-top:24px;color:var(--muted);font-size:16px}
-  .pill-row{display:flex;gap:8px;margin-top:22px;flex-wrap:wrap}
-  .pill{padding:6px 12px;border-radius:999px;font-weight:600;font-size:14px;color:#fff}
-  /* architecture */
-  .arch-wrap{flex:1;display:flex;align-items:center;justify-content:center;width:100%;margin:12px 0 18px}
-  .arch{display:flex;gap:14px;align-items:stretch;height:440px;width:100%}
-  .zone{border:2px dashed var(--line);border-radius:12px;padding:12px 14px 14px;display:flex;flex-direction:column;justify-content:space-between;position:relative}
-  .zone>.zt{font-size:13px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
-  .box{border-radius:8px;padding:10px 13px;color:#fff;font-weight:600;font-size:14.5px;line-height:1.25}
-  .box small{display:block;font-weight:400;font-size:12px;opacity:.92;margin-top:2px}
-  .arrow{display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:28px;font-weight:700;align-self:center}
-  .flowrow{display:flex;align-items:center;gap:8px}
-  .flowrow .box{flex:1}
-  .side{display:flex;gap:8px;align-items:center}
-  .side .box{flex:1}
-  .spark-tag{font-size:12px;color:var(--muted);background:#f1f5f9;border:1px solid #e2e8f0;padding:2px 8px;border-radius:999px;width:fit-content;margin:0 auto}
-  .steps{display:flex;gap:6px;margin-top:6px}
-  .step{flex:1;border-radius:7px;padding:8px 6px;text-align:center;font-size:12.5px;font-weight:600;color:#fff;position:relative}
-  .step b{display:block;font-size:20px}
-  pre{background:#0f172a;color:#e2e8f0;border-radius:7px;padding:10px 12px;font-size:12px;line-height:1.42;overflow:hidden;white-space:pre}
-  pre .c{color:#94a3b8} pre .k{color:#fbbf24} pre .g{color:#4ade80} pre .r{color:#f87171} pre .b{color:#60a5fa}
-  .kpi{display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:8px;padding:12px;color:#fff}
-  .kpi b{font-size:30px} .kpi span{font-size:13px;opacity:.95}
-  .hl{background:#fef9c3;padding:1px 4px;border-radius:3px}
-  .hl-ok{background:#dcfce7;color:#166534;padding:1px 4px;border-radius:3px;font-weight:600}
-  .hl-bad{background:#fee2e2;color:#991b1b;padding:1px 4px;border-radius:3px;font-weight:600}
-  #nav{position:fixed;bottom:14px;right:18px;color:#94a3b8;font-size:13px;font-family:sans-serif;user-select:none;z-index:99}
-  #nav button{background:#1e293b;color:#e2e8f0;border:0;border-radius:6px;padding:6px 10px;margin-left:4px;cursor:pointer}
-  #nav button:hover{background:#334155}
-  .deck-switcher{position:fixed;top:14px;right:18px;background:rgba(15,23,42,0.85);backdrop-filter:blur(6px);padding:6px 12px;border-radius:20px;border:1px solid #334155;font-size:12px;color:#cbd5e1;text-decoration:none;z-index:99;display:flex;align-items:center;gap:6px}
-  .deck-switcher:hover{background:#1e293b;color:#fff}
-  @media print{
-    @page{size:1280px 720px;margin:0}
-    html,body{background:#fff}
-    #deck{position:static;display:block}
-    .slide{display:flex!important;position:relative;transform:none!important;box-shadow:none;border-radius:0;page-break-after:always}
-    #nav,.deck-switcher{display:none}
-  }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TravelHub — Pipeline Showcase (Sample Data · Non-SCD2)</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #e2e8f0;
+      --card: #f8fafc;
+      --accent: #2563eb;
+      --accent2: #0ea5e9;
+      --raw: #64748b;
+      --bronze: #b45309;
+      --rejected: #dc2626;
+      --silver: #475569;
+      --quar: #ea580c;
+      --gold: #ca8a04;
+      --ch: #f59e0b;
+      --dbt: #ff694b;
+      --ok: #16a34a;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0
+    }
+
+    html,
+    body {
+      height: 100%;
+      background: var(--bg);
+      font-family: "Segoe UI", Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--ink)
+    }
+
+    #deck {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center
+    }
+
+    .slide {
+      position: absolute;
+      width: 1280px;
+      height: 720px;
+      background: #fff;
+      border-radius: 10px;
+      padding: 44px 56px 50px;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+      transform-origin: center center;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, .4)
+    }
+
+    .slide.active {
+      display: flex
+    }
+
+    .slide::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      right: 0;
+      height: 6px;
+      background: linear-gradient(90deg, var(--raw), var(--bronze), var(--silver), var(--gold), var(--accent))
+    }
+
+    .foot {
+      position: absolute;
+      left: 56px;
+      right: 56px;
+      bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12.5px;
+      color: var(--muted)
+    }
+
+    h1 {
+      font-size: 42px;
+      line-height: 1.18;
+      margin-bottom: 10px;
+      font-weight: 700
+    }
+
+    h2 {
+      font-size: 30px;
+      margin-bottom: 4px;
+      font-weight: 700
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: 16.5px;
+      margin-bottom: 18px
+    }
+
+    h3 {
+      font-size: 17.5px;
+      margin-bottom: 6px;
+      font-weight: 600
+    }
+
+    p,
+    li {
+      font-size: 16.5px;
+      line-height: 1.45
+    }
+
+    ul {
+      padding-left: 20px
+    }
+
+    li {
+      margin: 3px 0
+    }
+
+    .small li,
+    .small p {
+      font-size: 14px;
+      line-height: 1.4
+    }
+
+    code,
+    .mono {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: .88em;
+      background: #f1f5f9;
+      padding: 1px 5px;
+      border-radius: 4px
+    }
+
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      flex: 1
+    }
+
+    .grid3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px
+    }
+
+    .grid4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      padding: 14px 16px
+    }
+
+    .card h3 {
+      display: flex;
+      align-items: center;
+      gap: 7px
+    }
+
+    .tag {
+      display: inline-block;
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 999px;
+      color: #fff;
+      vertical-align: middle;
+      text-transform: uppercase
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 13.5px
+    }
+
+    th,
+    td {
+      border-bottom: 1px solid var(--line);
+      padding: 6px 8px;
+      text-align: left;
+      vertical-align: top
+    }
+
+    th {
+      background: #f1f5f9;
+      font-weight: 600;
+      color: #334155
+    }
+
+    td code {
+      font-size: 12px
+    }
+
+    .table-compact th,
+    .table-compact td {
+      padding: 4.5px 6px;
+      font-size: 12.5px
+    }
+
+    .muted {
+      color: var(--muted)
+    }
+
+    .center {
+      text-align: center
+    }
+
+    /* title slide */
+    .title {
+      justify-content: center;
+      background: radial-gradient(circle at 85% 20%, #dbeafe 0, #fff 45%)
+    }
+
+    .title .meta {
+      margin-top: 24px;
+      color: var(--muted);
+      font-size: 16px
+    }
+
+    .pill-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 22px;
+      flex-wrap: wrap
+    }
+
+    .pill {
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 14px;
+      color: #fff
+    }
+
+    /* architecture */
+    .arch-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      margin: 12px 0 18px
+    }
+
+    .arch {
+      display: flex;
+      gap: 14px;
+      align-items: stretch;
+      height: 440px;
+      width: 100%
+    }
+
+    .zone {
+      border: 2px dashed var(--line);
+      border-radius: 12px;
+      padding: 12px 14px 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative
+    }
+
+    .zone>.zt {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .6px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 2px
+    }
+
+    .box {
+      border-radius: 8px;
+      padding: 10px 13px;
+      color: #fff;
+      font-weight: 600;
+      font-size: 14.5px;
+      line-height: 1.25
+    }
+
+    .box small {
+      display: block;
+      font-weight: 400;
+      font-size: 12px;
+      opacity: .92;
+      margin-top: 2px
+    }
+
+    .arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 28px;
+      font-weight: 700;
+      align-self: center
+    }
+
+    .flowrow {
+      display: flex;
+      align-items: center;
+      gap: 8px
+    }
+
+    .flowrow .box {
+      flex: 1
+    }
+
+    .side {
+      display: flex;
+      gap: 8px;
+      align-items: center
+    }
+
+    .side .box {
+      flex: 1
+    }
+
+    .spark-tag {
+      font-size: 12px;
+      color: var(--muted);
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      padding: 2px 8px;
+      border-radius: 999px;
+      width: fit-content;
+      margin: 0 auto
+    }
+
+    .steps {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px
+    }
+
+    .step {
+      flex: 1;
+      border-radius: 7px;
+      padding: 8px 6px;
+      text-align: center;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #fff;
+      position: relative
+    }
+
+    .step b {
+      display: block;
+      font-size: 20px
+    }
+
+    pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      border-radius: 7px;
+      padding: 10px 12px;
+      font-size: 12px;
+      line-height: 1.42;
+      overflow: hidden;
+      white-space: pre
+    }
+
+    pre .c {
+      color: #94a3b8
+    }
+
+    pre .k {
+      color: #fbbf24
+    }
+
+    pre .g {
+      color: #4ade80
+    }
+
+    pre .r {
+      color: #f87171
+    }
+
+    pre .b {
+      color: #60a5fa
+    }
+
+    .kpi {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      padding: 12px;
+      color: #fff
+    }
+
+    .kpi b {
+      font-size: 30px
+    }
+
+    .kpi span {
+      font-size: 13px;
+      opacity: .95
+    }
+
+    .hl {
+      background: #fef9c3;
+      padding: 1px 4px;
+      border-radius: 3px
+    }
+
+    .hl-ok {
+      background: #dcfce7;
+      color: #166534;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-weight: 600
+    }
+
+    .hl-bad {
+      background: #fee2e2;
+      color: #991b1b;
+      padding: 1px 4px;
+      border-radius: 3px;
+      font-weight: 600
+    }
+
+    #nav {
+      position: fixed;
+      bottom: 14px;
+      right: 18px;
+      color: #94a3b8;
+      font-size: 13px;
+      font-family: sans-serif;
+      user-select: none;
+      z-index: 99
+    }
+
+    #nav button {
+      background: #1e293b;
+      color: #e2e8f0;
+      border: 0;
+      border-radius: 6px;
+      padding: 6px 10px;
+      margin-left: 4px;
+      cursor: pointer
+    }
+
+    #nav button:hover {
+      background: #334155
+    }
+
+    .deck-switcher {
+      position: fixed;
+      top: 14px;
+      right: 18px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(6px);
+      padding: 6px 12px;
+      border-radius: 20px;
+      border: 1px solid #334155;
+      font-size: 12px;
+      color: #cbd5e1;
+      text-decoration: none;
+      z-index: 99;
+      display: flex;
+      align-items: center;
+      gap: 6px
+    }
+
+    .deck-switcher:hover {
+      background: #1e293b;
+      color: #fff
+    }
+
+    @media print {
+      @page {
+        size: 1280px 720px;
+        margin: 0
+      }
+
+      html,
+      body {
+        background: #fff
+      }
+
+      #deck {
+        position: static;
+        display: block
+      }
+
+      .slide {
+        display: flex !important;
+        position: relative;
+        transform: none !important;
+        box-shadow: none;
+        border-radius: 0;
+        page-break-after: always
+      }
+
+      #nav,
+      .deck-switcher {
+        display: none
+      }
+    }
+  </style>
 </head>
+
 <body>
+  <!-- Slide gốc (Có SCD2) -->
+  <a href="demo_slides.html" class="deck-switcher" title="Chuyển sang bộ slide lý thuyết ban đầu">
+    <span>◀ </span>
+  </a>
 
-<a href="demo_slides.html" class="deck-switcher" title="Chuyển sang bộ slide lý thuyết ban đầu">
-  <span>◀ Slide gốc (Có SCD2)</span>
-</a>
+  <div id="deck">
 
-<div id="deck">
-
-<!-- 1. TITLE -->
-<section class="slide title">
-  <div class="tag" style="background:var(--accent);width:max-content;margin-bottom:14px;font-size:13px">SAMPLE SHOWCASE · DATA ENGINEERING</div>
-  <h1>TravelHub Data Platform<br>Minh Họa Pipeline &amp; Bộ Dữ Liệu Kiểm Thử</h1>
-  <p class="sub" style="font-size:20px">Phân tích toàn diện 26 ca kiểm thử thực tế: Đa định dạng CSV+XML, Làm sạch, Dedup, Băm PII, ASOF FX &amp; Star Schema</p>
-  <div class="pill-row">
-    <span class="pill" style="background:#475569">Sample Showcase (~10 records)</span>
-    <span class="pill" style="background:#e25a1c">Apache Spark 3.5</span>
-    <span class="pill" style="background:var(--ch)">ClickHouse 24.3</span>
-    <span class="pill" style="background:var(--dbt)">dbt 1.7</span>
-    <span class="pill" style="background:var(--ok)">No SCD2 (Mô hình tinh giản)</span>
-    <span class="pill" style="background:#20a7c9">Superset BI</span>
-  </div>
-  <div class="meta">Bộ dữ liệu: <code>data/sample_showcase/</code> · Môn: Data Engineering · HK1</div>
-</section>
-
-<!-- 2. REQUIREMENTS -->
-<section class="slide">
-  <h2>Bối cảnh &amp; Yêu cầu xử lý (Sample Showcase)</h2>
-  <p class="sub">Tập trung giải quyết triệt để 5 vấn đề cốt lõi của kỹ thuật dữ liệu lớn</p>
-  <div class="grid2">
-    <div class="card">
-      <h3>📌 5 Bài toán dữ liệu đầu vào</h3>
-      <ul class="small">
-        <li><b>Đa định dạng (Multi-format)</b>: Bookings đến song song từ file nội bộ CSV và đối tác OTA dạng XML.</li>
-        <li><b>Dữ liệu bẩn phức tạp</b>: Tiền tệ lẫn chữ/ký hiệu (<code>"$25,500,000.00"</code>, <code>" 24,500,000 VND "</code>, <code>"FREE_PROMO_VOUCHER"</code>).</li>
-        <li><b>Trạng thái &amp; kênh không chuẩn</b>: <code>confirm / 1 / CONFIRMED</code>; kênh <code>app_android / web / partner_ota_agoda</code>.</li>
-        <li><b>Bản ghi trùng &amp; lỗi logic</b>: Trùng <code>booking_id</code> khác timestamp, ngày trả phòng trước ngày nhận phòng (<code>nights &le; 0</code>), thiếu key định danh.</li>
-        <li><b>Dữ liệu cá nhân (PII)</b>: Họ tên, Email, SĐT của khách hàng trong CRM cần được ẩn danh trước khi nạp vào kho.</li>
-        <li><b>Đa tiền tệ</b>: VND, THB, SGD, USD theo các mốc tỷ giá thay đổi theo thời gian.</li>
-      </ul>
-    </div>
-    <div class="card">
-      <h3>✅ Tiêu chuẩn kiến trúc &amp; đầu ra</h3>
-      <table class="table-compact">
-        <tr><th style="width:36%">Tiêu chí</th><th>Cách hiện thực trong Pipeline</th></tr>
-        <tr><td><b>Idempotent</b></td><td>Ghi đè phân vùng Lake (<code>dt=YYYY-MM-DD</code>) và xoá trước khi nạp vào Staging.</td></tr>
-        <tr><td><b>Không mất dữ liệu</b></td><td>Bản ghi sai logic/schema được chuyển vào <code>quarantine/</code> kèm mã lỗi <code>_dq_reason</code>.</td></tr>
-        <tr><td><b>Bảo mật PII</b></td><td>Xoá <code>full_name</code>, mã hoá SHA-256 cho Email và Số điện thoại ngay tại Silver.</td></tr>
-        <tr><td><b>Tỷ giá hiệu lực</b></td><td>Dùng <b>ASOF JOIN</b> với bảng seed tỷ giá để quy đổi chính xác theo ngày đặt phòng.</td></tr>
-        <tr><td><b>Đối soát (Reconciliation)</b></td><td>Tự động kiểm tra số dòng: <code>Bronze = Silver + Quarantine</code>; <code>Silver = Staging</code>.</td></tr>
-        <tr><td><b>Star Schema</b></td><td>ClickHouse Marts: Fact trung tâm kết nối Dimension chuẩn, báo cáo doanh thu USD.</td></tr>
-      </table>
-    </div>
-  </div>
-  <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
-</section>
-
-<!-- 3. GOALS -->
-<section class="slide">
-  <h2>Mục tiêu &amp; Quy mô kiểm thử</h2>
-  <p class="sub">Tập dữ liệu tinh gọn (~10 dòng/bảng) được thiết kế có chủ đích cho từng tình huống kiểm thử</p>
-  <div class="grid3" style="margin-bottom:14px">
-    <div class="card"><h3>🗄️ 1. Lưu trữ bất biến</h3><p class="small">Lưu toàn bộ file thô (CSV/XML) tại <code>raw/</code> trên S3-compatible, phục vụ đối soát và chạy lại độc lập.</p></div>
-    <div class="card"><h3>🧹 2. Làm sạch có cách ly</h3><p class="small">Tách biệt dòng sạch vào <code>silver/</code> và dòng lỗi vào <code>quarantine/</code>, không nuốt lỗi và không để rác vào DWH.</p></div>
-    <div class="card"><h3>🔐 3. Bảo vệ dữ liệu PII</h3><p class="small">Tuân thủ GDPR: Băm SHA-256 email/phone, loại bỏ tên thật trước khi dữ liệu rời khỏi Data Lake.</p></div>
-    <div class="card"><h3>💱 4. Quy đổi ASOF FX</h3><p class="small">Xử lý mốc đổi tỷ giá tự động tại thời điểm giao dịch, chuẩn hoá toàn bộ báo cáo doanh thu về USD.</p></div>
-    <div class="card"><h3>⭐ 5. Star Schema phân tích</h3><p class="small">Mô hình hoá Star Schema trên ClickHouse: <code>fact_bookings</code>, <code>fact_payments</code>, <code>dim_hotels</code>, <code>dim_customers</code>.</p></div>
-    <div class="card"><h3>📊 6. Báo cáo Marts</h3><p class="small">Tính toán tự động doanh thu thực tế (loại trừ đơn huỷ), tỷ lệ huỷ phòng và hiệu suất khách sạn.</p></div>
-  </div>
-  <div class="grid4">
-    <div class="kpi" style="background:var(--raw)"><b>26</b><span>bản ghi thô kiểm thử</span></div>
-    <div class="kpi" style="background:var(--quar)"><b>8</b><span>ca lỗi cách ly (Quarantine)</span></div>
-    <div class="kpi" style="background:var(--ok)"><b>18</b><span>bản ghi sạch nạp vào DWH</span></div>
-    <div class="kpi" style="background:var(--accent)"><b>100%</b><span>đối soát khớp số liệu</span></div>
-  </div>
-  <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
-</section>
-
-<!-- 4. ARCHITECTURE -->
-<section class="slide">
-  <h2>Kiến trúc Pipeline Medallion (Không SCD2)</h2>
-  <p class="sub" style="margin-bottom:8px">Quy trình xử lý khép kín từ File Thô &rarr; Data Lake &rarr; Data Warehouse &rarr; Marts</p>
-  <div class="arch-wrap">
-    <div class="arch">
-      <div class="zone" style="width:170px">
-        <div class="zt">Nguồn (Sample Showcase)</div>
-        <div class="box" style="background:#334155">Bookings<small>6 CSV + 4 XML</small></div>
-        <div class="box" style="background:#334155">Hotels<small>5 XML</small></div>
-        <div class="box" style="background:#334155">Customers<small>5 CSV (PII)</small></div>
-        <div class="box" style="background:#334155">Payments<small>6 CSV (Refund)</small></div>
-        <div class="box" style="background:#334155">Clickstream<small>5 CSV</small></div>
+    <!-- 1. TITLE -->
+    <section class="slide title">
+      <div class="tag" style="background:var(--accent);width:max-content;margin-bottom:14px;font-size:13px">SAMPLE
+        SHOWCASE · DATA ENGINEERING</div>
+      <h1>TravelHub Data Platform<br>Minh Họa Pipeline &amp; Bộ Dữ Liệu Kiểm Thử</h1>
+      <p class="sub" style="font-size:20px">Phân tích toàn diện 26 ca kiểm thử thực tế: Đa định dạng CSV+XML, Làm sạch,
+        Dedup, Băm PII, ASOF FX &amp; Star Schema</p>
+      <div class="pill-row">
+        <span class="pill" style="background:#475569">Sample Showcase (~10 records)</span>
+        <span class="pill" style="background:#e25a1c">Apache Spark 3.5</span>
+        <span class="pill" style="background:var(--ch)">ClickHouse 24.3</span>
+        <span class="pill" style="background:var(--dbt)">dbt 1.7</span>
+        <span class="pill" style="background:var(--ok)">No SCD2 (Mô hình tinh giản)</span>
+        <span class="pill" style="background:#20a7c9">Superset BI</span>
       </div>
-      <div class="arrow">➜</div>
-      <div class="zone" style="flex:1.35;border-color:#94a3b8">
-        <div class="zt">Data Lake · SeaweedFS (S3)</div>
-        <div class="box" style="background:var(--raw)">raw/ <small>File gốc bất biến · upload bằng boto3</small></div>
-        <div class="center"><span class="spark-tag">▼ Spark: <code>ingest_bronze.py</code></span></div>
-        <div class="side">
-          <div class="box" style="background:var(--bronze)">bronze/ <small>Parquet · all-string + metadata</small></div>
-          <div class="box" style="background:var(--rejected);flex:.65">rejected/ <small>Malformed JSON</small></div>
-        </div>
-        <div class="center"><span class="spark-tag">▼ Spark: <code>cleanse_silver.py</code></span></div>
-        <div class="side">
-          <div class="box" style="background:var(--silver)">silver/ <small>Typed, Dedup, Hash PII</small></div>
-          <div class="box" style="background:var(--quar);flex:.75">quarantine/ <small>Vi phạm DQ + _dq_reason</small></div>
-        </div>
-      </div>
-      <div class="arrow" style="flex-direction:column;font-size:13px;gap:4px"><span style="font-size:28px">➜</span><span style="line-height:1.2;text-align:center">Spark<br>JDBC</span></div>
-      <div class="zone" style="flex:1.25;border-color:var(--ch)">
-        <div class="zt">Data Warehouse · ClickHouse</div>
-        <div class="box" style="background:#d97706">staging.* <small>ReplacingMergeTree · đối soát số dòng</small></div>
-        <div class="center"><span class="spark-tag">▼ dbt run</span></div>
-        <div class="box" style="background:var(--dbt)">stg_* views <small>Chuẩn hoá view, FINAL dedup</small></div>
-        <div class="side">
-          <div class="box" style="background:var(--gold)">dim_* <small>Dimensions chuẩn</small></div>
-          <div class="box" style="background:var(--gold)">fact_* <small>Facts + ASOF FX</small></div>
-        </div>
-        <div class="box" style="background:#a16207">rpt_* <small>Báo cáo doanh thu &amp; hiệu suất</small></div>
-      </div>
-      <div class="arrow">➜</div>
-      <div class="zone" style="width:165px">
-        <div class="zt">Phục vụ &amp; BI</div>
-        <div class="box" style="background:#20a7c9">Superset<small>Dashboard phân tích</small></div>
-        <div class="box" style="background:#475569">pipeline_runs<small>Audit log chi tiết</small></div>
-        <div class="box" style="background:var(--ok)">dbt test<small>Kiểm tra tự động</small></div>
-        <div class="box" style="background:#0f766e">Ad-hoc SQL<small>Truy vấn trực tiếp</small></div>
-      </div>
-    </div>
-  </div>
-  <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
-</section>
+      <div class="meta">Bộ dữ liệu: <code>data/sample_showcase/</code> · Môn: Data Engineering · HK1</div>
+    </section>
 
-<!-- 5. ORCHESTRATION -->
-<section class="slide">
-  <h2>Điều phối tự động 8 bước</h2>
-  <p class="sub">Thực thi toàn diện qua lệnh duy nhất: <code>python3 run_pipeline.py 2026-10-01</code></p>
-  <div class="steps">
-    <div class="step" style="background:#334155"><b>0</b>generate<br><span style="font-weight:400">copy sample</span></div>
-    <div class="step" style="background:var(--raw)"><b>1</b>upload_raw<br><span style="font-weight:400">local &rarr; raw/</span></div>
-    <div class="step" style="background:var(--bronze)"><b>2</b>spark_bronze<br><span style="font-weight:400">raw &rarr; bronze</span></div>
-    <div class="step" style="background:var(--silver)"><b>3</b>spark_silver<br><span style="font-weight:400">bronze &rarr; silver</span></div>
-    <div class="step" style="background:#d97706"><b>4</b>load_staging<br><span style="font-weight:400">silver &rarr; CH</span></div>
-    <div class="step" style="background:var(--dbt)"><b>5</b>dbt_seed<br><span style="font-weight:400">fx_rates</span></div>
-    <div class="step" style="background:var(--gold)"><b>6</b>dbt_run<br><span style="font-weight:400">dim/fact/rpt</span></div>
-    <div class="step" style="background:var(--ok)"><b>7</b>dbt_test<br><span style="font-weight:400">DQ kiểm thử</span></div>
-  </div>
-  <div class="grid2" style="margin-top:16px">
-    <div class="card small">
-      <h3>⚙️ Cơ chế thực thi</h3>
-      <ul>
-        <li>Điều phối trung tâm: <code>run_pipeline.py</code> quản lý tuần tự 8 bước qua subprocess.</li>
-        <li>Bắt lỗi &amp; dừng an toàn: Bước trước thất bại sẽ ngắt toàn bộ các bước phía sau.</li>
-        <li>Truyền nhận metrics: Spark in dòng JSON <code>PIPELINE_METRICS={...}</code> cho orchestrator đọc.</li>
-        <li>Ghi nhật ký vận hành (Audit Trail) vào ClickHouse: <code>analytics.pipeline_runs</code>.</li>
-      </ul>
-    </div>
-    <div class="card small">
-      <h3>🔁 Idempotent (Chạy lại an toàn)</h3>
-      <ul>
-        <li><b>Lake Partition</b>: Spark ghi đè phân vùng <code>dt=2026-10-01</code> mà không tạo file rác.</li>
-        <li><b>Staging ClickHouse</b>: Thực hiện <code>ALTER TABLE ... DELETE WHERE _batch_date = D</code> trước khi nạp batch mới.</li>
-        <li><b>dbt Marts</b>: Xây dựng lại toàn bộ bảng tổng hợp, đảm bảo dữ liệu luôn đồng nhất tuyệt đối.</li>
-        <li><b>Reconciliation</b>: So khớp số dòng tại Staging = số dòng tại Silver.</li>
-      </ul>
-    </div>
-  </div>
-  <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
-</section>
-
-<!-- 6. DATASET OVERVIEW -->
-<section class="slide">
-  <h2>Tổng quan tập dữ liệu <code>sample_showcase</code></h2>
-  <p class="sub">Tất cả file được lưu trữ tại <code>data/sample_showcase/</code></p>
-  <table class="table-compact">
-    <tr><th>Tên file nguồn</th><th>Định dạng</th><th>Số dòng</th><th>Các trường dữ liệu chính</th><th>Mục đích kiểm thử kỹ thuật</th></tr>
-    <tr><td><code>bookings_part1.csv</code></td><td>CSV</td><td>6 dòng</td><td>booking_id, hotel_id, user_id, checkin, checkout, total_amount, currency, status, channel</td><td>Tiền bẩn, dấu $, chữ VND, status thường, trùng key, ngày checkout &lt; checkin, thiếu ID</td></tr>
-    <tr><td><code>bookings_part2.xml</code></td><td>XML</td><td>4 dòng</td><td>&lt;booking_id&gt;, &lt;total_amount&gt;, &lt;currency&gt;, &lt;booking_status&gt;, &lt;source_channel&gt;</td><td>XML từ đối tác, status dạng số '1', tiền THB/SGD, đơn huỷ, amount là chuỗi chữ</td></tr>
-    <tr><td><code>hotels.xml</code></td><td>XML</td><td>5 khách sạn</td><td>hotel_id, hotel_name, star_rating, total_rooms, facilities, is_active</td><td>Snapshot khách sạn, chuỗi facilities <code>['spa', 'pool']</code>, star_rating = 7 (sai), rooms = -15 (âm)</td></tr>
-    <tr><td><code>customers.csv</code></td><td>CSV</td><td>5 khách hàng</td><td>user_id, full_name, email, phone, country, user_segment, loyalty_tier</td><td><b>Chứa thông tin PII</b> nhạy cảm (họ tên, email, phone), 1 bản ghi thiếu email, 1 thiếu phone</td></tr>
-    <tr><td><code>payments.csv</code></td><td>CSV</td><td>6 giao dịch</td><td>payment_id, booking_id, amount, currency, payment_status, refund_amount, refund_at</td><td>Tiền tệ bẩn, trạng thái SUCCESS/FAILED, giao dịch hoàn tiền ($500), số tiền không hợp lệ</td></tr>
-    <tr><td><code>clickstream.csv</code></td><td>CSV</td><td>5 sự kiện</td><td>event_id, session_id, user_id, event_type, page_url, device_type, event_timestamp</td><td>Hành trình người dùng (page_view &rarr; search &rarr; booking_submit), đa thiết bị</td></tr>
-    <tr><td><code>fx_rates.csv</code> (seed)</td><td>CSV</td><td>10 mốc</td><td>currency, units_per_usd, valid_from</td><td>Tỷ giá hối đoái có hiệu lực theo thời gian (trước và sau ngày 01/07/2026)</td></tr>
-  </table>
-  <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
-</section>
-
-<!-- 7. INPUT CASES: BOOKINGS -->
-<section class="slide">
-  <h2>Dữ liệu đầu vào: 10 ca kiểm thử Bookings</h2>
-  <p class="sub">Tập hợp tất cả các dạng dữ liệu dị thường xuất hiện trong hệ thống đặt phòng</p>
-  <table class="table-compact">
-    <tr><th>Mã &amp; File</th><th>Khách sạn &amp; User</th><th>Checkin &rarr; Out</th><th>Số tiền thô</th><th>Tiền tệ</th><th>Status thô</th><th>Kênh thô</th><th>Tình huống kiểm thử cần xử lý</th></tr>
-    <tr><td><span class="tag" style="background:#334155">CSV</span> <code>BK-DEMO-001</code></td><td>HTL-001 / USR-001</td><td>05-10 &rarr; 05-14</td><td><span class="hl-bad">" 24,500,000 VND "</span></td><td>VND</td><td><span class="hl-bad">confirm</span></td><td><span class="hl-bad">app_android</span></td><td>Tiền có dấu cách &amp; chữ VND, status chữ thường, kênh mã kỹ thuật, đặt trước mốc đổi tỷ giá</td></tr>
-    <tr><td><span class="tag" style="background:#334155">CSV</span> <code>BK-DEMO-002</code></td><td>HTL-001 / USR-001</td><td>08-15 &rarr; 08-18</td><td><span class="hl-bad">"$25,500,000.00"</span></td><td>VND</td><td>CONFIRMED</td><td>web</td><td>Tiền tệ VND nhưng bị gắn dấu ký hiệu $, đặt sau mốc đổi tỷ giá</td></tr>
-    <tr><td><span class="tag" style="background:#334155">CSV</span> <code>BK-DEMO-003 (v1)</code></td><td>HTL-002 / USR-002</td><td>09-01 &rarr; 09-05</td><td>350.00</td><td>USD</td><td>PENDING</td><td>website</td><td><b>Trùng mã booking_id</b>: Bản ghi cũ tạo lúc 09:00:00 &rarr; Cần loại bỏ vào Quarantine</td></tr>
-    <tr><td><span class="tag" style="background:#334155">CSV</span> <code>BK-DEMO-003 (v2)</code></td><td>HTL-002 / USR-002</td><td>09-01 &rarr; 09-05</td><td><span class="hl-bad">" 350.00 "</span></td><td>USD</td><td>CONFIRMED</td><td>website</td><td><b>Bản ghi mới nhất</b> tạo lúc 10:15:00 &rarr; Cần giữ lại nạp vào Silver</td></tr>
-    <tr><td><span class="tag" style="background:#334155">CSV</span> <code>BK-DEMO-004</code></td><td>HTL-002 / USR-002</td><td><span class="hl-bad">09-10 &rarr; 09-08</span></td><td>"$1,200.00"</td><td>USD</td><td>CONFIRMED</td><td>app_ios</td><td><b>Lỗi logic nghiệp vụ</b>: Checkout trước Checkin (nights = -2 &le; 0)</td></tr>
-    <tr><td><span class="tag" style="background:#334155">CSV</span> <span class="hl-bad">(NULL)</span></td><td>HTL-003 / USR-003</td><td>09-15 &rarr; 09-18</td><td>450.00</td><td>USD</td><td>CONFIRMED</td><td>web</td><td><b>Lỗi vi phạm schema</b>: Bản ghi bị khuyết trường khoá chính <code>booking_id</code></td></tr>
-    <tr><td><span class="tag" style="background:#e25a1c">XML</span> <code>BK-DEMO-005</code></td><td>HTL-002 / USR-002</td><td>09-12 &rarr; 09-15</td><td><span class="hl-bad">72,000 THB</span></td><td>THB</td><td><span class="hl-bad">1</span></td><td><span class="hl-bad">partner_ota_agoda</span></td><td>Định dạng XML, status mã hoá dạng số '1', tiền tệ Baht Thái, kênh đối tác Agoda</td></tr>
-    <tr><td><span class="tag" style="background:#e25a1c">XML</span> <code>BK-DEMO-006</code></td><td>HTL-001 / USR-001</td><td>09-20 &rarr; 09-22</td><td>$500.00</td><td>USD</td><td><span class="hl-bad">CANCELLED</span></td><td>web</td><td>Đơn phòng bị huỷ, có phát sinh giao dịch hoàn tiền 100% trong payments</td></tr>
-    <tr><td><span class="tag" style="background:#e25a1c">XML</span> <code>BK-DEMO-007</code></td><td>HTL-003 / USR-003</td><td>09-25 &rarr; 09-28</td><td><span class="hl-bad">1,340 SGD</span></td><td>SGD</td><td>CONFIRMED</td><td><span class="hl-bad">mobile app</span></td><td>Tiền tệ Đô Singapore, kênh viết thường có dấu cách</td></tr>
-    <tr><td><span class="tag" style="background:#e25a1c">XML</span> <code>BK-DEMO-008</code></td><td>HTL-003 / USR-003</td><td>09-28 &rarr; 09-30</td><td><span class="hl-bad">FREE_PROMO_VOUCHER</span></td><td>USD</td><td>CONFIRMED</td><td>web</td><td><b>Lỗi kiểu dữ liệu</b>: Số tiền là chuỗi chữ cái không thể chuyển thành Decimal</td></tr>
-  </table>
-  <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
-</section>
-
-<!-- 8. INPUT CASES: HOTELS, CUSTOMERS, PAYMENTS -->
-<section class="slide">
-  <h2>Dữ liệu đầu vào: Hotels, Customers &amp; Payments</h2>
-  <p class="sub">Kiểm tra bảo mật PII, lọc lỗi nghiệp vụ và xử lý giao dịch hoàn tiền</p>
-  <div class="grid3">
-    <div class="card small">
-      <h3>🏨 Hotels (5 XML)</h3>
-      <table class="table-compact">
-        <tr><th>ID</th><th>Sao</th><th>Phòng</th><th>Tình trạng</th></tr>
-        <tr><td><code>HTL-001</code></td><td>5★</td><td>150</td><td><span class="hl-ok">Hợp lệ</span> (luxury)</td></tr>
-        <tr><td><code>HTL-002</code></td><td>4★</td><td>80</td><td><span class="hl-ok">Hợp lệ</span> (boutique)</td></tr>
-        <tr><td><code>HTL-003</code></td><td>5★</td><td>220</td><td><span class="hl-ok">Hợp lệ</span> (luxury)</td></tr>
-        <tr><td><code>HTL-004</code></td><td><span class="hl-bad">7★</span></td><td>50</td><td><span class="hl-bad">Sai thang sao (&gt;5)</span></td></tr>
-        <tr><td><code>HTL-005</code></td><td>3★</td><td><span class="hl-bad">-15</span></td><td><span class="hl-bad">Số phòng âm (&le;0)</span></td></tr>
-      </table>
-      <p class="muted" style="margin-top:6px;font-size:12px"><code>facilities</code> dạng chuỗi mảng Python <code>"['spa', 'pool']"</code> cần chuẩn hoá.</p>
-    </div>
-    <div class="card small">
-      <h3>👤 Customers (5 CSV · PII)</h3>
-      <table class="table-compact">
-        <tr><th>User</th><th>Họ tên &amp; Email</th><th>Tình trạng</th></tr>
-        <tr><td><code>USR-001</code></td><td>Alice Nguyen (VN)</td><td><span class="hl-ok">PII chuẩn</span> &rarr; Cần băm</td></tr>
-        <tr><td><code>USR-002</code></td><td>Somchai P. (TH)</td><td><span class="hl-ok">PII chuẩn</span> &rarr; Cần băm</td></tr>
-        <tr><td><code>USR-003</code></td><td>David Tan (SG)</td><td><span class="hl-ok">PII chuẩn</span> &rarr; Cần băm</td></tr>
-        <tr><td><code>USR-004</code></td><td>Bob <span class="hl-bad">[Email trống]</span></td><td><span class="hl-bad">Thiếu email bắt buộc</span></td></tr>
-        <tr><td><code>USR-005</code></td><td>Charlie [Phone trống]</td><td><span class="hl-ok">Email hợp lệ</span> &rarr; Cho phép</td></tr>
-      </table>
-      <p class="muted" style="margin-top:6px;font-size:12px">Bắt buộc xoá <code>full_name</code> và băm SHA-256 email/phone.</p>
-    </div>
-    <div class="card small">
-      <h3>💳 Payments (6 CSV)</h3>
-      <table class="table-compact">
-        <tr><th>Payment</th><th>Booking</th><th>Số tiền</th><th>Tình trạng</th></tr>
-        <tr><td><code>PAY-001</code></td><td>BK-001</td><td>24,500,000 VND</td><td><span class="hl-ok">SUCCESS</span></td></tr>
-        <tr><td><code>PAY-002</code></td><td>BK-002</td><td>$25,500,000.00</td><td><span class="hl-ok">SUCCESS</span></td></tr>
-        <tr><td><code>PAY-003</code></td><td>BK-003</td><td>350.00 USD</td><td><span class="hl-ok">SUCCESS</span></td></tr>
-        <tr><td><code>PAY-004</code></td><td>BK-005</td><td>72,000 THB</td><td><span class="hl-ok">SUCCESS</span></td></tr>
-        <tr><td><code>PAY-005</code></td><td>BK-006</td><td>$500 (Hoàn $500)</td><td><span class="hl-ok">REFUND 100%</span></td></tr>
-        <tr><td><code>PAY-006</code></td><td>BK-007</td><td><span class="hl-bad">INVALID_MONEY</span></td><td><span class="hl-bad">Lỗi tiền tệ</span></td></tr>
-      </table>
-      <p class="muted" style="margin-top:6px;font-size:12px">PAY-005 liên kết hoàn tiền cho đơn huỷ BK-006.</p>
-    </div>
-  </div>
-  <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
-</section>
-
-<!-- 9. BRONZE LAYER -->
-<section class="slide">
-  <h2>Tầng Bronze: Đọc đa định dạng &amp; Lineage</h2>
-  <p class="sub"><code>ingest_bronze.py</code> — Đọc song song CSV &amp; XML, bảo toàn nguyên trạng dữ liệu chuỗi (all-string)</p>
-  <div class="grid2">
-    <div class="card small">
-      <h3>Xử lý kỹ thuật ở Bronze</h3>
-      <ul>
-        <li>Đọc song song CSV (có header) và XML (dùng <code>spark-xml</code> với <code>rowTag="booking"</code>).</li>
-        <li><b>Hợp nhất nguồn (Union)</b>: Gộp <code>bookings_part1.csv</code> (6 dòng) và <code>bookings_part2.xml</code> (4 dòng) thành 1 DataFrame 10 dòng đồng nhất bằng <code>unionByName</code>.</li>
-        <li><b>Bảo toàn thông tin</b>: Mọi cột đều được ép kiểu <code>StringType</code>, không bỏ sót ký tự bẩn.</li>
-        <li><b>Schema Contract</b>: Kiểm tra sự hiện diện của các cột bắt buộc, ghi nhận schema drift.</li>
-        <li><b>Gắn Metadata dòng dõi (Lineage)</b>:
-          <ul>
-            <li><code>_source_format</code>: định dạng file gốc (<code>csv</code> hoặc <code>xml</code>).</li>
-            <li><code>_source_file</code>: đường dẫn file trên Data Lake (S3).</li>
-            <li><code>_ingested_at</code>: dấu thời gian nạp dữ liệu.</li>
-            <li><code>_batch_date</code>: ngày xử lý phân vùng (<code>dt=2026-10-01</code>).</li>
+    <!-- 2. REQUIREMENTS -->
+    <section class="slide">
+      <h2>Bối cảnh &amp; Yêu cầu xử lý (Sample Showcase)</h2>
+      <p class="sub">Tập trung giải quyết triệt để 5 vấn đề cốt lõi của kỹ thuật dữ liệu</p>
+      <div class="grid2">
+        <div class="card">
+          <h3>📌 5 Bài toán dữ liệu đầu vào</h3>
+          <ul class="small">
+            <li><b>Đa định dạng (Multi-format)</b>: Bookings đến song song từ file nội bộ CSV và đối tác OTA dạng XML.
+            </li>
+            <li><b>Dữ liệu bẩn phức tạp</b>: Tiền tệ lẫn chữ/ký hiệu (<code>"$25,500,000.00"</code>,
+              <code>" 24,500,000 VND "</code>, <code>"FREE_PROMO_VOUCHER"</code>).
+            </li>
+            <li><b>Trạng thái &amp; kênh không chuẩn</b>: <code>confirm / 1 / CONFIRMED</code>; kênh
+              <code>app_android / web / partner_ota_agoda</code>.
+            </li>
+            <li><b>Bản ghi trùng &amp; lỗi logic</b>: Trùng <code>booking_id</code> khác timestamp, ngày trả phòng trước
+              ngày nhận phòng (<code>nights &le; 0</code>), thiếu key định danh.</li>
+            <li><b>Dữ liệu cá nhân (PII)</b>: Họ tên, Email, SĐT của khách hàng trong CRM cần được ẩn danh trước khi nạp
+              vào kho.</li>
+            <li><b>Đa tiền tệ</b>: VND, THB, SGD, USD theo các mốc tỷ giá thay đổi theo thời gian.</li>
           </ul>
-        </li>
-      </ul>
-    </div>
-    <div>
-      <h3>Kết quả Ingest tầng Bronze</h3>
+        </div>
+        <div class="card">
+          <h3>✅ Tiêu chuẩn kiến trúc &amp; đầu ra</h3>
+          <table class="table-compact">
+            <tr>
+              <th style="width:36%">Tiêu chí</th>
+              <th>Cách hiện thực trong Pipeline</th>
+            </tr>
+            <tr>
+              <td><b>Idempotent</b></td>
+              <td>Ghi đè phân vùng Lake (<code>dt=YYYY-MM-DD</code>) và xoá trước khi nạp vào Staging.</td>
+            </tr>
+            <tr>
+              <td><b>Không mất dữ liệu</b></td>
+              <td>Bản ghi sai logic/schema được chuyển vào <code>quarantine/</code> kèm mã lỗi <code>_dq_reason</code>.
+              </td>
+            </tr>
+            <tr>
+              <td><b>Bảo mật PII</b></td>
+              <td>Xoá <code>full_name</code>, mã hoá SHA-256 cho Email và Số điện thoại ngay tại Silver.</td>
+            </tr>
+            <tr>
+              <td><b>Tỷ giá hiệu lực</b></td>
+              <td>Dùng <b>ASOF JOIN</b> với bảng seed tỷ giá để quy đổi chính xác theo ngày đặt phòng.</td>
+            </tr>
+            <tr>
+              <td><b>Đối soát (Reconciliation)</b></td>
+              <td>Tự động kiểm tra số dòng: <code>Bronze = Silver + Quarantine</code>; <code>Silver = Staging</code>.
+              </td>
+            </tr>
+            <tr>
+              <td><b>Star Schema</b></td>
+              <td>ClickHouse Marts: Fact trung tâm kết nối Dimension chuẩn, báo cáo doanh thu USD.</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+      <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
+    </section>
+
+    <!-- 3. GOALS -->
+    <section class="slide">
+      <h2>Mục tiêu &amp; Quy mô kiểm thử</h2>
+      <p class="sub">Tập dữ liệu tinh gọn (~10 dòng/bảng) được thiết kế có chủ đích cho từng tình huống kiểm thử</p>
+      <div class="grid3" style="margin-bottom:14px">
+        <div class="card">
+          <h3>🗄️ 1. Lưu trữ bất biến</h3>
+          <p class="small">Lưu toàn bộ file thô (CSV/XML) tại <code>raw/</code> trên S3-compatible, phục vụ đối soát và
+            chạy lại độc lập.</p>
+        </div>
+        <div class="card">
+          <h3>🧹 2. Làm sạch có cách ly</h3>
+          <p class="small">Tách biệt dòng sạch vào <code>silver/</code> và dòng lỗi vào <code>quarantine/</code>, không
+            nuốt lỗi và không để rác vào DWH.</p>
+        </div>
+        <div class="card">
+          <h3>🔐 3. Bảo vệ dữ liệu PII</h3>
+          <p class="small">Tuân thủ GDPR: Băm SHA-256 email/phone, loại bỏ tên thật trước khi dữ liệu rời khỏi Data
+            Lake.</p>
+        </div>
+        <div class="card">
+          <h3>💱 4. Quy đổi ASOF FX</h3>
+          <p class="small">Xử lý mốc đổi tỷ giá tự động tại thời điểm giao dịch, chuẩn hoá toàn bộ báo cáo doanh thu về
+            USD.</p>
+        </div>
+        <div class="card">
+          <h3>⭐ 5. Star Schema phân tích</h3>
+          <p class="small">Mô hình hoá Star Schema trên ClickHouse: <code>fact_bookings</code>,
+            <code>fact_payments</code>, <code>dim_hotels</code>, <code>dim_customers</code>.
+          </p>
+        </div>
+        <div class="card">
+          <h3>📊 6. Báo cáo Marts</h3>
+          <p class="small">Tính toán tự động doanh thu thực tế (loại trừ đơn huỷ), tỷ lệ huỷ phòng và hiệu suất khách
+            sạn.</p>
+        </div>
+      </div>
+      <div class="grid4">
+        <div class="kpi" style="background:var(--raw)"><b>26</b><span>bản ghi thô kiểm thử</span></div>
+        <div class="kpi" style="background:var(--quar)"><b>8</b><span>ca lỗi cách ly (Quarantine)</span></div>
+        <div class="kpi" style="background:var(--ok)"><b>18</b><span>bản ghi sạch nạp vào DWH</span></div>
+        <div class="kpi" style="background:var(--accent)"><b>100%</b><span>đối soát khớp số liệu</span></div>
+      </div>
+      <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
+    </section>
+
+    <!-- 4. ARCHITECTURE -->
+    <section class="slide">
+      <h2>Kiến trúc Pipeline</h2>
+      <p class="sub" style="margin-bottom:8px">Quy trình xử lý khép kín từ File Thô &rarr; Data Lake &rarr; Data
+        Warehouse &rarr; Marts</p>
+      <div class="arch-wrap">
+        <div class="arch">
+          <div class="zone" style="width:170px">
+            <div class="zt">Nguồn (Sample Showcase)</div>
+            <div class="box" style="background:#334155">Bookings<small>6 CSV + 4 XML</small></div>
+            <div class="box" style="background:#334155">Hotels<small>5 XML</small></div>
+            <div class="box" style="background:#334155">Customers<small>5 CSV (PII)</small></div>
+            <div class="box" style="background:#334155">Payments<small>6 CSV (Refund)</small></div>
+            <div class="box" style="background:#334155">Clickstream<small>5 CSV</small></div>
+          </div>
+          <div class="arrow">➜</div>
+          <div class="zone" style="flex:1.35;border-color:#94a3b8">
+            <div class="zt">Data Lake · SeaweedFS (S3)</div>
+            <div class="box" style="background:var(--raw)">raw/ <small>File gốc bất biến · upload bằng boto3</small>
+            </div>
+            <div class="center"><span class="spark-tag">▼ Spark: <code>ingest_bronze.py</code></span></div>
+            <div class="side">
+              <div class="box" style="background:var(--bronze)">bronze/ <small>Parquet · all-string + metadata</small>
+              </div>
+              <div class="box" style="background:var(--rejected);flex:.65">rejected/ <small>Malformed JSON</small></div>
+            </div>
+            <div class="center"><span class="spark-tag">▼ Spark: <code>cleanse_silver.py</code></span></div>
+            <div class="side">
+              <div class="box" style="background:var(--silver)">silver/ <small>Typed, Dedup, Hash PII</small></div>
+              <div class="box" style="background:var(--quar);flex:.75">quarantine/ <small>Vi phạm DQ +
+                  _dq_reason</small></div>
+            </div>
+          </div>
+          <div class="arrow" style="flex-direction:column;font-size:13px;gap:4px"><span
+              style="font-size:28px">➜</span><span style="line-height:1.2;text-align:center">Spark<br>JDBC</span></div>
+          <div class="zone" style="flex:1.25;border-color:var(--ch)">
+            <div class="zt">Data Warehouse · ClickHouse</div>
+            <div class="box" style="background:#d97706">staging.* <small>ReplacingMergeTree · đối soát số dòng</small>
+            </div>
+            <div class="center"><span class="spark-tag">▼ dbt run</span></div>
+            <div class="box" style="background:var(--dbt)">stg_* views <small>Chuẩn hoá view, FINAL dedup</small></div>
+            <div class="side">
+              <div class="box" style="background:var(--gold)">dim_* <small>Dimensions chuẩn</small></div>
+              <div class="box" style="background:var(--gold)">fact_* <small>Facts + ASOF FX</small></div>
+            </div>
+            <div class="box" style="background:#a16207">rpt_* <small>Báo cáo doanh thu &amp; hiệu suất</small></div>
+          </div>
+          <div class="arrow">➜</div>
+          <div class="zone" style="width:165px">
+            <div class="zt">Phục vụ &amp; BI</div>
+            <div class="box" style="background:#20a7c9">Superset<small>Dashboard phân tích</small></div>
+            <div class="box" style="background:#475569">pipeline_runs<small>Audit log chi tiết</small></div>
+            <div class="box" style="background:var(--ok)">dbt test<small>Kiểm tra tự động</small></div>
+            <div class="box" style="background:#0f766e">Ad-hoc SQL<small>Truy vấn trực tiếp</small></div>
+          </div>
+        </div>
+      </div>
+      <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
+    </section>
+
+    <!-- 5. ORCHESTRATION -->
+    <section class="slide">
+      <h2>Điều phối tự động 8 bước</h2>
+      <p class="sub">Thực thi toàn diện qua lệnh duy nhất: <code>python3 run_pipeline.py 2026-10-01</code></p>
+      <div class="steps">
+        <div class="step" style="background:#334155"><b>0</b>generate<br><span style="font-weight:400">copy
+            sample</span></div>
+        <div class="step" style="background:var(--raw)"><b>1</b>upload_raw<br><span style="font-weight:400">local &rarr;
+            raw/</span></div>
+        <div class="step" style="background:var(--bronze)"><b>2</b>spark_bronze<br><span style="font-weight:400">raw
+            &rarr; bronze</span></div>
+        <div class="step" style="background:var(--silver)"><b>3</b>spark_silver<br><span style="font-weight:400">bronze
+            &rarr; silver</span></div>
+        <div class="step" style="background:#d97706"><b>4</b>load_staging<br><span style="font-weight:400">silver &rarr;
+            CH</span></div>
+        <div class="step" style="background:var(--dbt)"><b>5</b>dbt_seed<br><span
+            style="font-weight:400">fx_rates</span></div>
+        <div class="step" style="background:var(--gold)"><b>6</b>dbt_run<br><span
+            style="font-weight:400">dim/fact/rpt</span></div>
+        <div class="step" style="background:var(--ok)"><b>7</b>dbt_test<br><span style="font-weight:400">DQ kiểm
+            thử</span></div>
+      </div>
+      <div class="grid2" style="margin-top:16px">
+        <div class="card small">
+          <h3>⚙️ Cơ chế thực thi</h3>
+          <ul>
+            <li>Điều phối trung tâm: <code>run_pipeline.py</code> quản lý tuần tự 8 bước qua subprocess.</li>
+            <li>Bắt lỗi &amp; dừng an toàn: Bước trước thất bại sẽ ngắt toàn bộ các bước phía sau.</li>
+            <li>Truyền nhận metrics: Spark in dòng JSON <code>PIPELINE_METRICS={...}</code> cho orchestrator đọc.</li>
+            <li>Ghi nhật ký vận hành (Audit Trail) vào ClickHouse: <code>analytics.pipeline_runs</code>.</li>
+          </ul>
+        </div>
+        <div class="card small">
+          <h3>🔁 Idempotent (Chạy lại an toàn)</h3>
+          <ul>
+            <li><b>Lake Partition</b>: Spark ghi đè phân vùng <code>dt=2026-10-01</code> mà không tạo file rác.</li>
+            <li><b>Staging ClickHouse</b>: Thực hiện <code>ALTER TABLE ... DELETE WHERE _batch_date = D</code> trước khi
+              nạp batch mới.</li>
+            <li><b>dbt Marts</b>: Xây dựng lại toàn bộ bảng tổng hợp, đảm bảo dữ liệu luôn đồng nhất tuyệt đối.</li>
+            <li><b>Reconciliation</b>: So khớp số dòng tại Staging = số dòng tại Silver.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
+    </section>
+
+    <!-- 6. DATASET OVERVIEW -->
+    <section class="slide">
+      <h2>Tổng quan tập dữ liệu <code>sample_showcase</code></h2>
+      <p class="sub">Tất cả file được lưu trữ tại <code>data/sample_showcase/</code></p>
       <table class="table-compact">
-        <tr><th>Nguồn dữ liệu</th><th>Số dòng đọc</th><th>Vào Bronze</th><th>Rejected (JSON hỏng)</th></tr>
-        <tr><td><b>bookings</b> (CSV + XML)</td><td>6 + 4 = 10</td><td><span class="hl-ok">10</span></td><td>0</td></tr>
-        <tr><td><b>hotels</b> (XML)</td><td>5</td><td><span class="hl-ok">5</span></td><td>0</td></tr>
-        <tr><td><b>customers</b> (CSV)</td><td>5</td><td><span class="hl-ok">5</span></td><td>0</td></tr>
-        <tr><td><b>payments</b> (CSV)</td><td>6</td><td><span class="hl-ok">6</span></td><td>0</td></tr>
-        <tr><td><b>clickstream</b> (CSV)</td><td>5</td><td><span class="hl-ok">5</span></td><td>0</td></tr>
-        <tr><td><b>TỔNG CỘNG</b></td><td><b>31</b></td><td><b>31 dòng Parquet</b></td><td><b>0 dòng hỏng</b></td></tr>
+        <tr>
+          <th>Tên file nguồn</th>
+          <th>Định dạng</th>
+          <th>Các trường dữ liệu chính</th>
+          <th>Mục đích kiểm thử kỹ thuật</th>
+        </tr>
+        <tr>
+          <td><code>bookings_part1.csv</code></td>
+          <td>CSV</td>
+          <td>booking_id, hotel_id, user_id, checkin, checkout, total_amount, currency, status, channel</td>
+          <td>Tiền bẩn, dấu $, chữ VND, status thường, trùng key, ngày checkout &lt; checkin, thiếu ID</td>
+        </tr>
+        <tr>
+          <td><code>bookings_part2.xml</code></td>
+          <td>XML</td>
+          <td>&lt;booking_id&gt;, &lt;total_amount&gt;, &lt;currency&gt;, &lt;booking_status&gt;, &lt;source_channel&gt;
+          </td>
+          <td>XML từ đối tác, status dạng số '1', tiền THB/SGD, đơn huỷ, amount là chuỗi chữ</td>
+        </tr>
+        <tr>
+          <td><code>hotels.xml</code></td>
+          <td>XML</td>
+          <td>hotel_id, hotel_name, star_rating, total_rooms, facilities, is_active</td>
+          <td>Snapshot khách sạn, chuỗi facilities <code>['spa', 'pool']</code>, star_rating = 7 (sai), rooms = -15 (âm)
+          </td>
+        </tr>
+        <tr>
+          <td><code>customers.csv</code></td>
+          <td>CSV</td>
+          <td>user_id, full_name, email, phone, country, user_segment, loyalty_tier</td>
+          <td><b>Chứa thông tin PII</b> nhạy cảm (họ tên, email, phone), 1 bản ghi thiếu email, 1 thiếu phone</td>
+        </tr>
+        <tr>
+          <td><code>payments.csv</code></td>
+          <td>CSV</td>
+          <td>payment_id, booking_id, amount, currency, payment_status, refund_amount, refund_at</td>
+          <td>Tiền tệ bẩn, trạng thái SUCCESS/FAILED, giao dịch hoàn tiền ($500), số tiền không hợp lệ</td>
+        </tr>
+        <tr>
+          <td><code>clickstream.csv</code></td>
+          <td>CSV</td>
+          <td>event_id, session_id, user_id, event_type, page_url, device_type, event_timestamp</td>
+          <td>Hành trình người dùng (page_view &rarr; search &rarr; booking_submit), đa thiết bị</td>
+        </tr>
+        <tr>
+          <td><code>fx_rates.csv</code> (seed)</td>
+          <td>CSV</td>
+          <td>currency, units_per_usd, valid_from</td>
+          <td>Tỷ giá hối đoái có hiệu lực theo thời gian (trước và sau ngày 01/07/2026)</td>
+        </tr>
       </table>
-<pre style="margin-top:10px">{<span class="b">"booking_id"</span>: <span class="g">"BK-DEMO-001"</span>,
+      <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
+    </section>
+
+    <!-- 7. INPUT CASES: BOOKINGS -->
+    <section class="slide">
+      <h2>Dữ liệu đầu vào: 10 ca kiểm thử Bookings</h2>
+      <p class="sub">Tập hợp tất cả các dạng dữ liệu dị thường xuất hiện trong hệ thống đặt phòng</p>
+      <table class="table-compact">
+        <tr>
+          <th>Mã &amp; File</th>
+          <th>Khách sạn &amp; User</th>
+          <th>Checkin &rarr; Out</th>
+          <th>Số tiền thô</th>
+          <th>Tiền tệ</th>
+          <th>Status thô</th>
+          <th>Kênh thô</th>
+          <th>Tình huống kiểm thử cần xử lý</th>
+        </tr>
+        <tr>
+          <td><span class="tag" style="background:#334155">CSV</span> <code>BK-DEMO-001</code></td>
+          <td>HTL-001 / USR-001</td>
+          <td>05-10 &rarr; 05-14</td>
+          <td><span class="hl-bad">" 24,500,000 VND "</span></td>
+          <td>VND</td>
+          <td><span class="hl-bad">confirm</span></td>
+          <td><span class="hl-bad">app_android</span></td>
+          <td>Tiền có dấu cách &amp; chữ VND, status chữ thường, kênh mã kỹ thuật, đặt trước mốc đổi tỷ giá</td>
+        </tr>
+        <tr>
+          <td><span class="tag" style="background:#334155">CSV</span> <code>BK-DEMO-002</code></td>
+          <td>HTL-001 / USR-001</td>
+          <td>08-15 &rarr; 08-18</td>
+          <td><span class="hl-bad">"$25,500,000.00"</span></td>
+          <td>VND</td>
+          <td>CONFIRMED</td>
+          <td>web</td>
+          <td>Tiền tệ VND nhưng bị gắn dấu ký hiệu $, đặt sau mốc đổi tỷ giá</td>
+        </tr>
+        <tr>
+          <td><span class="tag" style="background:#334155">CSV</span> <code>BK-DEMO-003 (v1)</code></td>
+          <td>HTL-002 / USR-002</td>
+          <td>09-01 &rarr; 09-05</td>
+          <td>350.00</td>
+          <td>USD</td>
+          <td>PENDING</td>
+          <td>website</td>
+          <td><b>Trùng mã booking_id</b>: Bản ghi cũ tạo lúc 09:00:00 &rarr; Cần loại bỏ vào Quarantine</td>
+        </tr>
+        <tr>
+          <td><span class="tag" style="background:#334155">CSV</span> <code>BK-DEMO-003 (v2)</code></td>
+          <td>HTL-002 / USR-002</td>
+          <td>09-01 &rarr; 09-05</td>
+          <td><span class="hl-bad">" 350.00 "</span></td>
+          <td>USD</td>
+          <td>CONFIRMED</td>
+          <td>website</td>
+          <td><b>Bản ghi mới nhất</b> tạo lúc 10:15:00 &rarr; Cần giữ lại nạp vào Silver</td>
+        </tr>
+        <tr>
+          <td><span class="tag" style="background:#334155">CSV</span> <code>BK-DEMO-004</code></td>
+          <td>HTL-002 / USR-002</td>
+          <td><span class="hl-bad">09-10 &rarr; 09-08</span></td>
+          <td>"$1,200.00"</td>
+          <td>USD</td>
+          <td>CONFIRMED</td>
+          <td>app_ios</td>
+          <td><b>Lỗi logic nghiệp vụ</b>: Checkout trước Checkin (nights = -2 &le; 0)</td>
+        </tr>
+        <tr>
+          <td><span class="tag" style="background:#334155">CSV</span> <span class="hl-bad">(NULL)</span></td>
+          <td>HTL-003 / USR-003</td>
+          <td>09-15 &rarr; 09-18</td>
+          <td>450.00</td>
+          <td>USD</td>
+          <td>CONFIRMED</td>
+          <td>web</td>
+          <td><b>Lỗi vi phạm schema</b>: Bản ghi bị khuyết trường khoá chính <code>booking_id</code></td>
+        </tr>
+        <tr>
+          <td><span class="tag" style="background:#e25a1c">XML</span> <code>BK-DEMO-005</code></td>
+          <td>HTL-002 / USR-002</td>
+          <td>09-12 &rarr; 09-15</td>
+          <td><span class="hl-bad">72,000 THB</span></td>
+          <td>THB</td>
+          <td><span class="hl-bad">1</span></td>
+          <td><span class="hl-bad">partner_ota_agoda</span></td>
+          <td>Định dạng XML, status mã hoá dạng số '1', tiền tệ Baht Thái, kênh đối tác Agoda</td>
+        </tr>
+        <tr>
+          <td><span class="tag" style="background:#e25a1c">XML</span> <code>BK-DEMO-006</code></td>
+          <td>HTL-001 / USR-001</td>
+          <td>09-20 &rarr; 09-22</td>
+          <td>$500.00</td>
+          <td>USD</td>
+          <td><span class="hl-bad">CANCELLED</span></td>
+          <td>web</td>
+          <td>Đơn phòng bị huỷ, có phát sinh giao dịch hoàn tiền 100% trong payments</td>
+        </tr>
+        <tr>
+          <td><span class="tag" style="background:#e25a1c">XML</span> <code>BK-DEMO-007</code></td>
+          <td>HTL-003 / USR-003</td>
+          <td>09-25 &rarr; 09-28</td>
+          <td><span class="hl-bad">1,340 SGD</span></td>
+          <td>SGD</td>
+          <td>CONFIRMED</td>
+          <td><span class="hl-bad">mobile app</span></td>
+          <td>Tiền tệ Đô Singapore, kênh viết thường có dấu cách</td>
+        </tr>
+        <tr>
+          <td><span class="tag" style="background:#e25a1c">XML</span> <code>BK-DEMO-008</code></td>
+          <td>HTL-003 / USR-003</td>
+          <td>09-28 &rarr; 09-30</td>
+          <td><span class="hl-bad">FREE_PROMO_VOUCHER</span></td>
+          <td>USD</td>
+          <td>CONFIRMED</td>
+          <td>web</td>
+          <td><b>Lỗi kiểu dữ liệu</b>: Số tiền là chuỗi chữ cái không thể chuyển thành Decimal</td>
+        </tr>
+      </table>
+      <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
+    </section>
+
+    <!-- 8. INPUT CASES: HOTELS, CUSTOMERS, PAYMENTS -->
+    <section class="slide">
+      <h2>Dữ liệu đầu vào: Hotels, Customers &amp; Payments</h2>
+      <p class="sub">Kiểm tra bảo mật PII, lọc lỗi nghiệp vụ và xử lý giao dịch hoàn tiền</p>
+      <div class="grid3">
+        <div class="card small">
+          <h3>🏨 Hotels (5 XML)</h3>
+          <table class="table-compact">
+            <tr>
+              <th>ID</th>
+              <th>Sao</th>
+              <th>Phòng</th>
+              <th>Tình trạng</th>
+            </tr>
+            <tr>
+              <td><code>HTL-001</code></td>
+              <td>5★</td>
+              <td>150</td>
+              <td><span class="hl-ok">Hợp lệ</span> (luxury)</td>
+            </tr>
+            <tr>
+              <td><code>HTL-002</code></td>
+              <td>4★</td>
+              <td>80</td>
+              <td><span class="hl-ok">Hợp lệ</span> (boutique)</td>
+            </tr>
+            <tr>
+              <td><code>HTL-003</code></td>
+              <td>5★</td>
+              <td>220</td>
+              <td><span class="hl-ok">Hợp lệ</span> (luxury)</td>
+            </tr>
+            <tr>
+              <td><code>HTL-004</code></td>
+              <td><span class="hl-bad">7★</span></td>
+              <td>50</td>
+              <td><span class="hl-bad">Sai thang sao (&gt;5)</span></td>
+            </tr>
+            <tr>
+              <td><code>HTL-005</code></td>
+              <td>3★</td>
+              <td><span class="hl-bad">-15</span></td>
+              <td><span class="hl-bad">Số phòng âm (&le;0)</span></td>
+            </tr>
+          </table>
+          <p class="muted" style="margin-top:6px;font-size:12px"><code>facilities</code> dạng chuỗi mảng Python
+            <code>"['spa', 'pool']"</code> cần chuẩn hoá.
+          </p>
+        </div>
+        <div class="card small">
+          <h3>👤 Customers (5 CSV · PII)</h3>
+          <table class="table-compact">
+            <tr>
+              <th>User</th>
+              <th>Họ tên &amp; Email</th>
+              <th>Tình trạng</th>
+            </tr>
+            <tr>
+              <td><code>USR-001</code></td>
+              <td>Alice Nguyen (VN)</td>
+              <td><span class="hl-ok">PII chuẩn</span> &rarr; Cần băm</td>
+            </tr>
+            <tr>
+              <td><code>USR-002</code></td>
+              <td>Somchai P. (TH)</td>
+              <td><span class="hl-ok">PII chuẩn</span> &rarr; Cần băm</td>
+            </tr>
+            <tr>
+              <td><code>USR-003</code></td>
+              <td>David Tan (SG)</td>
+              <td><span class="hl-ok">PII chuẩn</span> &rarr; Cần băm</td>
+            </tr>
+            <tr>
+              <td><code>USR-004</code></td>
+              <td>Bob <span class="hl-bad">[Email trống]</span></td>
+              <td><span class="hl-bad">Thiếu email bắt buộc</span></td>
+            </tr>
+            <tr>
+              <td><code>USR-005</code></td>
+              <td>Charlie [Phone trống]</td>
+              <td><span class="hl-ok">Email hợp lệ</span> &rarr; Cho phép</td>
+            </tr>
+          </table>
+          <p class="muted" style="margin-top:6px;font-size:12px">Bắt buộc xoá <code>full_name</code> và băm SHA-256
+            email/phone.</p>
+        </div>
+        <div class="card small">
+          <h3>💳 Payments (6 CSV)</h3>
+          <table class="table-compact">
+            <tr>
+              <th>Payment</th>
+              <th>Booking</th>
+              <th>Số tiền</th>
+              <th>Tình trạng</th>
+            </tr>
+            <tr>
+              <td><code>PAY-001</code></td>
+              <td>BK-001</td>
+              <td>24,500,000 VND</td>
+              <td><span class="hl-ok">SUCCESS</span></td>
+            </tr>
+            <tr>
+              <td><code>PAY-002</code></td>
+              <td>BK-002</td>
+              <td>$25,500,000.00</td>
+              <td><span class="hl-ok">SUCCESS</span></td>
+            </tr>
+            <tr>
+              <td><code>PAY-003</code></td>
+              <td>BK-003</td>
+              <td>350.00 USD</td>
+              <td><span class="hl-ok">SUCCESS</span></td>
+            </tr>
+            <tr>
+              <td><code>PAY-004</code></td>
+              <td>BK-005</td>
+              <td>72,000 THB</td>
+              <td><span class="hl-ok">SUCCESS</span></td>
+            </tr>
+            <tr>
+              <td><code>PAY-005</code></td>
+              <td>BK-006</td>
+              <td>$500 (Hoàn $500)</td>
+              <td><span class="hl-ok">REFUND 100%</span></td>
+            </tr>
+            <tr>
+              <td><code>PAY-006</code></td>
+              <td>BK-007</td>
+              <td><span class="hl-bad">INVALID_MONEY</span></td>
+              <td><span class="hl-bad">Lỗi tiền tệ</span></td>
+            </tr>
+          </table>
+          <p class="muted" style="margin-top:6px;font-size:12px">PAY-005 liên kết hoàn tiền cho đơn huỷ BK-006.</p>
+        </div>
+      </div>
+      <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
+    </section>
+
+    <!-- 9. BRONZE LAYER -->
+    <section class="slide">
+      <h2>Tầng Bronze: Đọc đa định dạng &amp; Lineage</h2>
+      <p class="sub"><code>ingest_bronze.py</code> — Đọc song song CSV &amp; XML, bảo toàn nguyên trạng dữ liệu chuỗi
+        (all-string)</p>
+      <div class="grid2">
+        <div class="card small">
+          <h3>Xử lý kỹ thuật ở Bronze</h3>
+          <ul>
+            <li>Đọc song song CSV (có header) và XML (dùng <code>spark-xml</code> với <code>rowTag="booking"</code>).
+            </li>
+            <li><b>Hợp nhất nguồn (Union)</b>: Gộp <code>bookings_part1.csv</code> (6 dòng) và
+              <code>bookings_part2.xml</code> (4 dòng) thành 1 DataFrame 10 dòng đồng nhất bằng
+              <code>unionByName</code>.
+            </li>
+            <li><b>Bảo toàn thông tin</b>: Mọi cột đều được ép kiểu <code>StringType</code>, không bỏ sót ký tự bẩn.
+            </li>
+            <li><b>Schema Contract</b>: Kiểm tra sự hiện diện của các cột bắt buộc, ghi nhận schema drift.</li>
+            <li><b>Gắn Metadata dòng dõi (Lineage)</b>:
+              <ul>
+                <li><code>_source_format</code>: định dạng file gốc (<code>csv</code> hoặc <code>xml</code>).</li>
+                <li><code>_source_file</code>: đường dẫn file trên Data Lake (S3).</li>
+                <li><code>_ingested_at</code>: dấu thời gian nạp dữ liệu.</li>
+                <li><code>_batch_date</code>: ngày xử lý phân vùng (<code>dt=2026-10-01</code>).</li>
+              </ul>
+            </li>
+          </ul>
+        </div>
+        <div>
+          <h3>Kết quả Ingest tầng Bronze</h3>
+          <table class="table-compact">
+            <tr>
+              <th>Nguồn dữ liệu</th>
+              <th>Số dòng đọc</th>
+              <th>Vào Bronze</th>
+              <th>Rejected (JSON hỏng)</th>
+            </tr>
+            <tr>
+              <td><b>bookings</b> (CSV + XML)</td>
+              <td>6 + 4 = 10</td>
+              <td><span class="hl-ok">10</span></td>
+              <td>0</td>
+            </tr>
+            <tr>
+              <td><b>hotels</b> (XML)</td>
+              <td>5</td>
+              <td><span class="hl-ok">5</span></td>
+              <td>0</td>
+            </tr>
+            <tr>
+              <td><b>customers</b> (CSV)</td>
+              <td>5</td>
+              <td><span class="hl-ok">5</span></td>
+              <td>0</td>
+            </tr>
+            <tr>
+              <td><b>payments</b> (CSV)</td>
+              <td>6</td>
+              <td><span class="hl-ok">6</span></td>
+              <td>0</td>
+            </tr>
+            <tr>
+              <td><b>clickstream</b> (CSV)</td>
+              <td>5</td>
+              <td><span class="hl-ok">5</span></td>
+              <td>0</td>
+            </tr>
+            <tr>
+              <td><b>TỔNG CỘNG</b></td>
+              <td><b>31</b></td>
+              <td><b>31 dòng Parquet</b></td>
+              <td><b>0 dòng hỏng</b></td>
+            </tr>
+          </table>
+          <pre
+            style="margin-top:10px">{<span class="b">"booking_id"</span>: <span class="g">"BK-DEMO-001"</span>,
  <span class="b">"total_amount"</span>: <span class="r">" 24,500,000 VND "</span>,
  <span class="b">"booking_status"</span>: <span class="r">"confirm"</span>,
  <span class="b">"source_channel"</span>: <span class="r">"app_android"</span>,
  <span class="k">"_source_format"</span>: <span class="g">"csv"</span>,
  <span class="k">"_source_file"</span>: <span class="g">"s3a://travelhub-lake/raw/bookings/.../bookings_part1.csv"</span>}</pre>
-    </div>
-  </div>
-  <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
-</section>
+        </div>
+      </div>
+      <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
+    </section>
 
-<!-- 10. SILVER TRANSFORMATIONS -->
-<section class="slide">
-  <h2>Tầng Silver: Chuẩn hoá, Ép kiểu &amp; Bảo mật</h2>
-  <p class="sub"><code>cleanse_silver.py</code> — Thực thi biến đổi dữ liệu, lọc trùng và băm thông tin cá nhân</p>
-  <div class="grid2">
-    <div>
-      <h3>Các quy tắc làm sạch dữ liệu</h3>
-      <table class="table-compact">
-        <tr><th>Trường</th><th>Giá trị thô (Bronze)</th><th>Sau xử lý (Silver)</th><th>Quy tắc kỹ thuật</th></tr>
-        <tr><td><b>Số tiền</b></td><td><code>" 24,500,000 VND "</code><br><code>"$25,500,000.00"</code></td><td><code>24500000.00</code><br><code>25500000.00</code></td><td>Regex <code>[^0-9.]</code> &rarr; loại bỏ ký tự lạ, ép sang <code>Decimal(15,2)</code></td></tr>
-        <tr><td><b>Số tiền lỗi</b></td><td><code>"FREE_PROMO_VOUCHER"</code></td><td><code>NULL</code> &rarr; Quarantine</td><td>Không có ký tự số &rarr; trả về NULL</td></tr>
-        <tr><td><b>Trạng thái</b></td><td><code>confirm</code>, <code>1</code></td><td><code>CONFIRMED</code></td><td>Upper + Map chuỗi chuẩn</td></tr>
-        <tr><td><b>Kênh bán</b></td><td><code>app_android</code>, <code>mobile app</code><br><code>partner_ota_agoda</code></td><td><code>Mobile App</code><br><code>Partner API</code></td><td>Phân loại theo quy ước chuẩn của Business</td></tr>
-        <tr><td><b>Số đêm</b></td><td>Checkin &amp; Checkout</td><td><code>nights = datediff(...)</code></td><td>Tính toán số đêm thực tế</td></tr>
-        <tr><td><b>Tiện ích KS</b></td><td><code>"['spa', 'pool']"</code></td><td><code>"spa,pool"</code></td><td>Loại bỏ ngoặc vuông và nháy đơn</td></tr>
-        <tr><td><b>Bảo mật PII</b></td><td><code>full_name</code>: "Alice Nguyen"<br><code>email</code>, <code>phone</code></td><td><span class="hl-bad">DROP hoàn toàn</span><br><code>email_hash</code>, <code>phone_hash</code></td><td>Mã hoá SHA-256 chuỗi lowercase và loại bỏ ký tự đặc biệt ở SĐT</td></tr>
-      </table>
-    </div>
-    <div class="card small">
-      <h3>Deduplication (Khử trùng bản ghi)</h3>
-      <p>Sử dụng Spark Window Function trên nhóm khoá chính:</p>
-<pre><span class="k">Window</span>.partitionBy(<span class="g">"booking_id"</span>) \
+    <!-- 10. SILVER TRANSFORMATIONS -->
+    <section class="slide">
+      <h2>Tầng Silver: Chuẩn hoá, Ép kiểu &amp; Bảo mật</h2>
+      <p class="sub"><code>cleanse_silver.py</code> — Thực thi biến đổi dữ liệu, lọc trùng và băm thông tin cá nhân</p>
+      <div class="grid2">
+        <div>
+          <h3>Các quy tắc làm sạch dữ liệu</h3>
+          <table class="table-compact">
+            <tr>
+              <th>Trường</th>
+              <th>Giá trị thô (Bronze)</th>
+              <th>Sau xử lý (Silver)</th>
+              <th>Quy tắc kỹ thuật</th>
+            </tr>
+            <tr>
+              <td><b>Số tiền</b></td>
+              <td><code>" 24,500,000 VND "</code><br><code>"$25,500,000.00"</code></td>
+              <td><code>24500000.00</code><br><code>25500000.00</code></td>
+              <td>Regex <code>[^0-9.]</code> &rarr; loại bỏ ký tự lạ, ép sang <code>Decimal(15,2)</code></td>
+            </tr>
+            <tr>
+              <td><b>Số tiền lỗi</b></td>
+              <td><code>"FREE_PROMO_VOUCHER"</code></td>
+              <td><code>NULL</code> &rarr; Quarantine</td>
+              <td>Không có ký tự số &rarr; trả về NULL</td>
+            </tr>
+            <tr>
+              <td><b>Trạng thái</b></td>
+              <td><code>confirm</code>, <code>1</code></td>
+              <td><code>CONFIRMED</code></td>
+              <td>Upper + Map chuỗi chuẩn</td>
+            </tr>
+            <tr>
+              <td><b>Kênh bán</b></td>
+              <td><code>app_android</code>, <code>mobile app</code><br><code>partner_ota_agoda</code></td>
+              <td><code>Mobile App</code><br><code>Partner API</code></td>
+              <td>Phân loại theo quy ước chuẩn của Business</td>
+            </tr>
+            <tr>
+              <td><b>Số đêm</b></td>
+              <td>Checkin &amp; Checkout</td>
+              <td><code>nights = datediff(...)</code></td>
+              <td>Tính toán số đêm thực tế</td>
+            </tr>
+            <tr>
+              <td><b>Tiện ích KS</b></td>
+              <td><code>"['spa', 'pool']"</code></td>
+              <td><code>"spa,pool"</code></td>
+              <td>Loại bỏ ngoặc vuông và nháy đơn</td>
+            </tr>
+            <tr>
+              <td><b>Bảo mật PII</b></td>
+              <td><code>full_name</code>: "Alice Nguyen"<br><code>email</code>, <code>phone</code></td>
+              <td><span class="hl-bad">DROP hoàn toàn</span><br><code>email_hash</code>, <code>phone_hash</code></td>
+              <td>Mã hoá SHA-256 chuỗi lowercase và loại bỏ ký tự đặc biệt ở SĐT</td>
+            </tr>
+          </table>
+        </div>
+        <div class="card small">
+          <h3>Deduplication (Khử trùng bản ghi)</h3>
+          <p>Sử dụng Spark Window Function trên nhóm khoá chính:</p>
+          <pre><span class="k">Window</span>.partitionBy(<span class="g">"booking_id"</span>) \
       .orderBy(F.col(<span class="g">"created_at"</span>).desc_nulls_last())
 
 ranked = df.withColumn(<span class="k">"_rn"</span>, F.row_number().over(w))
 valid = ranked.filter(<span class="k">"_rn == 1"</span>)
 dups  = ranked.filter(<span class="k">"_rn &gt; 1"</span>).withColumn(<span class="r">"_dq_reason"</span>, F.lit(<span class="r">"DUPLICATE_KEY"</span>))</pre>
-      <div class="card" style="margin-top:10px;background:#fff;border-left:4px solid var(--accent)">
-        <b>Kiểm thử thực tế trên BK-DEMO-003:</b>
-        <ul>
-          <li>Bản ghi v2 (tạo lúc <code>10:15:00</code>) có <code>_rn = 1</code> &rarr; <b>Giữ lại vào Silver</b>.</li>
-          <li>Bản ghi v1 (tạo lúc <code>09:00:00</code>) có <code>_rn = 2</code> &rarr; <b>Cách ly vào Quarantine</b>.</li>
-        </ul>
+          <div class="card" style="margin-top:10px;background:#fff;border-left:4px solid var(--accent)">
+            <b>Kiểm thử thực tế trên BK-DEMO-003:</b>
+            <ul>
+              <li>Bản ghi v2 (tạo lúc <code>10:15:00</code>) có <code>_rn = 1</code> &rarr; <b>Giữ lại vào Silver</b>.
+              </li>
+              <li>Bản ghi v1 (tạo lúc <code>09:00:00</code>) có <code>_rn = 2</code> &rarr; <b>Cách ly vào
+                  Quarantine</b>.</li>
+            </ul>
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
-  <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
-</section>
+      <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
+    </section>
 
-<!-- 11. QUARANTINE: ALL 8 CASES -->
-<section class="slide">
-  <h2>Tầng Quarantine: Cách ly toàn bộ 8 ca lỗi</h2>
-  <p class="sub">Dữ liệu vi phạm không bị xoá bỏ mà được lưu tại <code>quarantine/&lt;entity&gt;/</code> kèm mã lỗi <code>_dq_reason</code> để điều tra</p>
-  <table class="table-compact">
-    <tr><th>Nguồn &amp; Bản ghi</th><th>Giá trị vi phạm thực tế</th><th>Mã lỗi <code>_dq_reason</code></th><th>Luật kiểm tra Data Quality (DQ Rule)</th><th>Ý nghĩa nghiệp vụ &amp; Xử lý</th></tr>
-    <tr><td><span class="tag" style="background:#334155">Bookings</span> <code>BK-DEMO-003 (v1)</code></td><td>Trùng ID với bản ghi 10:15, status PENDING</td><td><span class="hl-bad">DUPLICATE_KEY</span></td><td><code>_rn &gt; 1</code> trong Window Partition theo booking_id</td><td>Bản ghi cũ bị thay thế bởi bản ghi cập nhật sau đó</td></tr>
-    <tr><td><span class="tag" style="background:#334155">Bookings</span> <code>BK-DEMO-004</code></td><td>Checkin: 2026-09-10 &gt; Checkout: 2026-09-08</td><td><span class="hl-bad">NON_POSITIVE_NIGHTS</span></td><td><code>coalesce(nights, 0) &le; 0</code> (ở đây nights = -2)</td><td>Lỗi logic ngày đặt phòng không hợp lệ</td></tr>
-    <tr><td><span class="tag" style="background:#334155">Bookings</span> <code>(NULL)</code></td><td>booking_id bị chuỗi rỗng / NULL</td><td><span class="hl-bad">MISSING_BOOKING_ID</span></td><td><code>col("booking_id").isNull()</code></td><td>Thiếu khoá chính định danh thực thể</td></tr>
-    <tr><td><span class="tag" style="background:#334155">Bookings</span> <code>BK-DEMO-008</code></td><td>total_amount = "FREE_PROMO_VOUCHER"</td><td><span class="hl-bad">INVALID_AMOUNT</span></td><td><code>col("total_amount").isNull()</code> (không parse được)</td><td>Chuỗi voucher không thể ép kiểu sang số tiền</td></tr>
-    <tr><td><span class="tag" style="background:#b45309">Hotels</span> <code>HTL-004</code></td><td>star_rating = 7</td><td><span class="hl-bad">INVALID_STAR_RATING</span></td><td><code>star_rating NOT BETWEEN 1 AND 5</code></td><td>Xếp hạng sao vượt ngưỡng tiêu chuẩn khách sạn</td></tr>
-    <tr><td><span class="tag" style="background:#b45309">Hotels</span> <code>HTL-005</code></td><td>total_rooms = -15</td><td><span class="hl-bad">INVALID_TOTAL_ROOMS</span></td><td><code>coalesce(total_rooms, 0) &le; 0</code></td><td>Số phòng khách sạn không được phép âm</td></tr>
-    <tr><td><span class="tag" style="background:#475569">Customers</span> <code>USR-004</code></td><td>email bị rỗng / NULL</td><td><span class="hl-bad">MISSING_EMAIL</span></td><td><code>col("email_hash") == ""</code></td><td>Khách hàng bắt buộc phải có email liên lạc</td></tr>
-    <tr><td><span class="tag" style="background:#d97706">Payments</span> <code>PAY-006</code></td><td>amount = "INVALID_MONEY"</td><td><span class="hl-bad">INVALID_AMOUNT</span></td><td><code>col("amount").isNull()</code></td><td>Số tiền thanh toán bị rác, không hạch toán được</td></tr>
-  </table>
-  <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
-</section>
+    <!-- 11. QUARANTINE: ALL 8 CASES -->
+    <section class="slide">
+      <h2>Tầng Quarantine: Cách ly toàn bộ 8 ca lỗi</h2>
+      <p class="sub">Dữ liệu vi phạm không bị xoá bỏ mà được lưu tại <code>quarantine/&lt;entity&gt;/</code> kèm mã lỗi
+        <code>_dq_reason</code> để điều tra
+      </p>
+      <table class="table-compact">
+        <tr>
+          <th>Nguồn &amp; Bản ghi</th>
+          <th>Giá trị vi phạm thực tế</th>
+          <th>Mã lỗi <code>_dq_reason</code></th>
+          <th>Luật kiểm tra Data Quality (DQ Rule)</th>
+          <th>Ý nghĩa nghiệp vụ &amp; Xử lý</th>
+        </tr>
+        <tr>
+          <td><span class="tag" style="background:#334155">Bookings</span> <code>BK-DEMO-003 (v1)</code></td>
+          <td>Trùng ID với bản ghi 10:15, status PENDING</td>
+          <td><span class="hl-bad">DUPLICATE_KEY</span></td>
+          <td><code>_rn &gt; 1</code> trong Window Partition theo booking_id</td>
+          <td>Bản ghi cũ bị thay thế bởi bản ghi cập nhật sau đó</td>
+        </tr>
+        <tr>
+          <td><span class="tag" style="background:#334155">Bookings</span> <code>BK-DEMO-004</code></td>
+          <td>Checkin: 2026-09-10 &gt; Checkout: 2026-09-08</td>
+          <td><span class="hl-bad">NON_POSITIVE_NIGHTS</span></td>
+          <td><code>coalesce(nights, 0) &le; 0</code> (ở đây nights = -2)</td>
+          <td>Lỗi logic ngày đặt phòng không hợp lệ</td>
+        </tr>
+        <tr>
+          <td><span class="tag" style="background:#334155">Bookings</span> <code>(NULL)</code></td>
+          <td>booking_id bị chuỗi rỗng / NULL</td>
+          <td><span class="hl-bad">MISSING_BOOKING_ID</span></td>
+          <td><code>col("booking_id").isNull()</code></td>
+          <td>Thiếu khoá chính định danh thực thể</td>
+        </tr>
+        <tr>
+          <td><span class="tag" style="background:#334155">Bookings</span> <code>BK-DEMO-008</code></td>
+          <td>total_amount = "FREE_PROMO_VOUCHER"</td>
+          <td><span class="hl-bad">INVALID_AMOUNT</span></td>
+          <td><code>col("total_amount").isNull()</code> (không parse được)</td>
+          <td>Chuỗi voucher không thể ép kiểu sang số tiền</td>
+        </tr>
+        <tr>
+          <td><span class="tag" style="background:#b45309">Hotels</span> <code>HTL-004</code></td>
+          <td>star_rating = 7</td>
+          <td><span class="hl-bad">INVALID_STAR_RATING</span></td>
+          <td><code>star_rating NOT BETWEEN 1 AND 5</code></td>
+          <td>Xếp hạng sao vượt ngưỡng tiêu chuẩn khách sạn</td>
+        </tr>
+        <tr>
+          <td><span class="tag" style="background:#b45309">Hotels</span> <code>HTL-005</code></td>
+          <td>total_rooms = -15</td>
+          <td><span class="hl-bad">INVALID_TOTAL_ROOMS</span></td>
+          <td><code>coalesce(total_rooms, 0) &le; 0</code></td>
+          <td>Số phòng khách sạn không được phép âm</td>
+        </tr>
+        <tr>
+          <td><span class="tag" style="background:#475569">Customers</span> <code>USR-004</code></td>
+          <td>email bị rỗng / NULL</td>
+          <td><span class="hl-bad">MISSING_EMAIL</span></td>
+          <td><code>col("email_hash") == ""</code></td>
+          <td>Khách hàng bắt buộc phải có email liên lạc</td>
+        </tr>
+        <tr>
+          <td><span class="tag" style="background:#d97706">Payments</span> <code>PAY-006</code></td>
+          <td>amount = "INVALID_MONEY"</td>
+          <td><span class="hl-bad">INVALID_AMOUNT</span></td>
+          <td><code>col("amount").isNull()</code></td>
+          <td>Số tiền thanh toán bị rác, không hạch toán được</td>
+        </tr>
+      </table>
+      <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
+    </section>
 
-<!-- 12. SILVER OUTPUT: CLEAN DATA -->
-<section class="slide">
-  <h2>Tầng Silver: Dữ liệu sạch sẵn sàng nạp vào DWH</h2>
-  <p class="sub">18 bản ghi vượt qua toàn bộ các bài kiểm tra DQ, chuẩn hoá kiểu dữ liệu và băm PII</p>
-  <div class="grid2">
-    <div>
-      <h3>Silver Bookings (6 bản ghi sạch)</h3>
-      <table class="table-compact">
-        <tr><th>ID</th><th>Hotel</th><th>User</th><th>Đêm</th><th>Số tiền</th><th>Cur</th><th>Status</th><th>Channel</th></tr>
-        <tr><td><code>BK-001</code></td><td>HTL-001</td><td>USR-001</td><td>4</td><td>24,500,000.00</td><td>VND</td><td><span class="hl-ok">CONFIRMED</span></td><td>Mobile App</td></tr>
-        <tr><td><code>BK-002</code></td><td>HTL-001</td><td>USR-001</td><td>3</td><td>25,500,000.00</td><td>VND</td><td><span class="hl-ok">CONFIRMED</span></td><td>Web</td></tr>
-        <tr><td><code>BK-003</code></td><td>HTL-002</td><td>USR-002</td><td>4</td><td>350.00</td><td>USD</td><td><span class="hl-ok">CONFIRMED</span></td><td>Web</td></tr>
-        <tr><td><code>BK-005</code></td><td>HTL-002</td><td>USR-002</td><td>3</td><td>72,000.00</td><td>THB</td><td><span class="hl-ok">CONFIRMED</span></td><td>Partner API</td></tr>
-        <tr><td><code>BK-006</code></td><td>HTL-001</td><td>USR-001</td><td>2</td><td>500.00</td><td>USD</td><td><span class="hl-bad">CANCELLED</span></td><td>Web</td></tr>
-        <tr><td><code>BK-007</code></td><td>HTL-003</td><td>USR-003</td><td>3</td><td>1,340.00</td><td>SGD</td><td><span class="hl-ok">CONFIRMED</span></td><td>Mobile App</td></tr>
-      </table>
-      <h3 style="margin-top:8px">Silver Hotels (3 KS) &amp; Payments (5 GD)</h3>
-      <p class="small"><b>Hotels</b>: <code>HTL-001</code> (5★, 150p), <code>HTL-002</code> (4★, 80p), <code>HTL-003</code> (5★, 220p).</p>
-      <p class="small"><b>Payments</b>: <code>PAY-001</code> &rarr; <code>PAY-005</code> (riêng PAY-005 ghi nhận hoàn tiền $500 cho BK-006).</p>
-    </div>
-    <div>
-      <h3>Silver Customers (4 khách hàng &middot; Băm PII)</h3>
-      <table class="table-compact">
-        <tr><th>User ID</th><th>email_hash (SHA-256)</th><th>phone_hash (SHA-256)</th><th>Tier</th></tr>
-        <tr><td><code>USR-001</code></td><td><code>5c34e8979fcfa7...</code></td><td><code>a19b08f4efc6d4...</code></td><td>Platinum</td></tr>
-        <tr><td><code>USR-002</code></td><td><code>e2a1b94567ef84...</code></td><td><code>7d891b92019485...</code></td><td>Gold</td></tr>
-        <tr><td><code>USR-003</code></td><td><code>389faec099248b...</code></td><td><code>029abce9102948...</code></td><td>Diamond</td></tr>
-        <tr><td><code>USR-005</code></td><td><code>d41d8cd98f00b2...</code></td><td><code>""</code> (trống)</td><td>Silver</td></tr>
-      </table>
-      <div class="card small" style="margin-top:12px;background:#f0fdf4;border-color:#bbf7d0">
-        <h3 style="color:#166534">🔒 Cam kết an toàn dữ liệu</h3>
-        <ul>
-          <li>Cột <code>full_name</code> đã bị Spark xoá hoàn toàn khỏi schema.</li>
-          <li>Email và Số điện thoại chỉ tồn tại dưới dạng mã băm một chiều SHA-256.</li>
-          <li>Không một thông tin định danh cá nhân thô nào được phép nạp vào Data Warehouse.</li>
-        </ul>
+    <!-- 12. SILVER OUTPUT: CLEAN DATA -->
+    <section class="slide">
+      <h2>Tầng Silver: Dữ liệu sạch sẵn sàng nạp vào DWH</h2>
+      <p class="sub">18 bản ghi vượt qua toàn bộ các bài kiểm tra DQ, chuẩn hoá kiểu dữ liệu và băm PII</p>
+      <div class="grid2">
+        <div>
+          <h3>Silver Bookings (6 bản ghi sạch)</h3>
+          <table class="table-compact">
+            <tr>
+              <th>ID</th>
+              <th>Hotel</th>
+              <th>User</th>
+              <th>Đêm</th>
+              <th>Số tiền</th>
+              <th>Cur</th>
+              <th>Status</th>
+              <th>Channel</th>
+            </tr>
+            <tr>
+              <td><code>BK-001</code></td>
+              <td>HTL-001</td>
+              <td>USR-001</td>
+              <td>4</td>
+              <td>24,500,000.00</td>
+              <td>VND</td>
+              <td><span class="hl-ok">CONFIRMED</span></td>
+              <td>Mobile App</td>
+            </tr>
+            <tr>
+              <td><code>BK-002</code></td>
+              <td>HTL-001</td>
+              <td>USR-001</td>
+              <td>3</td>
+              <td>25,500,000.00</td>
+              <td>VND</td>
+              <td><span class="hl-ok">CONFIRMED</span></td>
+              <td>Web</td>
+            </tr>
+            <tr>
+              <td><code>BK-003</code></td>
+              <td>HTL-002</td>
+              <td>USR-002</td>
+              <td>4</td>
+              <td>350.00</td>
+              <td>USD</td>
+              <td><span class="hl-ok">CONFIRMED</span></td>
+              <td>Web</td>
+            </tr>
+            <tr>
+              <td><code>BK-005</code></td>
+              <td>HTL-002</td>
+              <td>USR-002</td>
+              <td>3</td>
+              <td>72,000.00</td>
+              <td>THB</td>
+              <td><span class="hl-ok">CONFIRMED</span></td>
+              <td>Partner API</td>
+            </tr>
+            <tr>
+              <td><code>BK-006</code></td>
+              <td>HTL-001</td>
+              <td>USR-001</td>
+              <td>2</td>
+              <td>500.00</td>
+              <td>USD</td>
+              <td><span class="hl-bad">CANCELLED</span></td>
+              <td>Web</td>
+            </tr>
+            <tr>
+              <td><code>BK-007</code></td>
+              <td>HTL-003</td>
+              <td>USR-003</td>
+              <td>3</td>
+              <td>1,340.00</td>
+              <td>SGD</td>
+              <td><span class="hl-ok">CONFIRMED</span></td>
+              <td>Mobile App</td>
+            </tr>
+          </table>
+          <h3 style="margin-top:8px">Silver Hotels (3 KS) &amp; Payments (5 GD)</h3>
+          <p class="small"><b>Hotels</b>: <code>HTL-001</code> (5★, 150p), <code>HTL-002</code> (4★, 80p),
+            <code>HTL-003</code> (5★, 220p).
+          </p>
+          <p class="small"><b>Payments</b>: <code>PAY-001</code> &rarr; <code>PAY-005</code> (riêng PAY-005 ghi nhận
+            hoàn tiền $500 cho BK-006).</p>
+        </div>
+        <div>
+          <h3>Silver Customers (4 khách hàng &middot; Băm PII)</h3>
+          <table class="table-compact">
+            <tr>
+              <th>User ID</th>
+              <th>email_hash (SHA-256)</th>
+              <th>phone_hash (SHA-256)</th>
+              <th>Tier</th>
+            </tr>
+            <tr>
+              <td><code>USR-001</code></td>
+              <td><code>5c34e8979fcfa7...</code></td>
+              <td><code>a19b08f4efc6d4...</code></td>
+              <td>Platinum</td>
+            </tr>
+            <tr>
+              <td><code>USR-002</code></td>
+              <td><code>e2a1b94567ef84...</code></td>
+              <td><code>7d891b92019485...</code></td>
+              <td>Gold</td>
+            </tr>
+            <tr>
+              <td><code>USR-003</code></td>
+              <td><code>389faec099248b...</code></td>
+              <td><code>029abce9102948...</code></td>
+              <td>Diamond</td>
+            </tr>
+            <tr>
+              <td><code>USR-005</code></td>
+              <td><code>d41d8cd98f00b2...</code></td>
+              <td><code>""</code> (trống)</td>
+              <td>Silver</td>
+            </tr>
+          </table>
+          <div class="card small" style="margin-top:12px;background:#f0fdf4;border-color:#bbf7d0">
+            <h3 style="color:#166534">🔒 Cam kết an toàn dữ liệu</h3>
+            <ul>
+              <li>Cột <code>full_name</code> đã bị Spark xoá hoàn toàn khỏi schema.</li>
+              <li>Email và Số điện thoại chỉ tồn tại dưới dạng mã băm một chiều SHA-256.</li>
+              <li>Không một thông tin định danh cá nhân thô nào được phép nạp vào Data Warehouse.</li>
+            </ul>
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
-  <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
-</section>
+      <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
+    </section>
 
-<!-- 13. ASOF FX JOIN -->
-<section class="slide">
-  <h2>Quy đổi đa tiền tệ: ASOF JOIN theo ngày</h2>
-  <p class="sub">Tự động khớp tỷ giá hối đoái có hiệu lực gần nhất tại ngày đặt phòng (booked_date)</p>
-  <div class="grid2">
-    <div>
-      <h3>Bảng tỷ giá seed <code>fx_rates.csv</code></h3>
-      <table class="table-compact">
-        <tr><th>Tiền tệ</th><th>Tỷ giá / USD</th><th>Ngày hiệu lực</th><th>Ý nghĩa điều chỉnh</th></tr>
-        <tr><td><b>VND</b></td><td><b>24,500</b></td><td>2020-01-01</td><td>Tỷ giá VND giai đoạn 1</td></tr>
-        <tr><td><b>VND</b></td><td><b>25,500</b></td><td>2026-07-01</td><td><span class="hl">Điều chỉnh tăng tỷ giá VND</span></td></tr>
-        <tr><td><b>THB</b></td><td><b>35.0</b></td><td>2020-01-01</td><td>Tỷ giá Baht Thái cũ</td></tr>
-        <tr><td><b>THB</b></td><td><b>36.0</b></td><td>2026-07-01</td><td><span class="hl">Điều chỉnh tăng tỷ giá THB</span></td></tr>
-        <tr><td><b>SGD</b></td><td><b>1.34</b></td><td>2026-07-01</td><td>Tỷ giá Đô Singapore</td></tr>
-        <tr><td><b>USD</b></td><td><b>1.00</b></td><td>2020-01-01</td><td>Đồng tiền cơ sở</td></tr>
-      </table>
-      <h3 style="margin-top:8px">Cú pháp ASOF JOIN trong dbt</h3>
-<pre><span class="k">ASOF LEFT JOIN</span> {{ ref(<span class="g">'fx_rates'</span>) }} fx
+    <!-- 13. ASOF FX JOIN -->
+    <section class="slide">
+      <h2>Quy đổi đa tiền tệ: ASOF JOIN theo ngày</h2>
+      <p class="sub">Tự động khớp tỷ giá hối đoái có hiệu lực gần nhất tại ngày đặt phòng (booked_date)</p>
+      <div class="grid2">
+        <div>
+          <h3>Bảng tỷ giá seed <code>fx_rates.csv</code></h3>
+          <table class="table-compact">
+            <tr>
+              <th>Tiền tệ</th>
+              <th>Tỷ giá / USD</th>
+              <th>Ngày hiệu lực</th>
+              <th>Ý nghĩa điều chỉnh</th>
+            </tr>
+            <tr>
+              <td><b>VND</b></td>
+              <td><b>24,500</b></td>
+              <td>2020-01-01</td>
+              <td>Tỷ giá VND giai đoạn 1</td>
+            </tr>
+            <tr>
+              <td><b>VND</b></td>
+              <td><b>25,500</b></td>
+              <td>2026-07-01</td>
+              <td><span class="hl">Điều chỉnh tăng tỷ giá VND</span></td>
+            </tr>
+            <tr>
+              <td><b>THB</b></td>
+              <td><b>35.0</b></td>
+              <td>2020-01-01</td>
+              <td>Tỷ giá Baht Thái cũ</td>
+            </tr>
+            <tr>
+              <td><b>THB</b></td>
+              <td><b>36.0</b></td>
+              <td>2026-07-01</td>
+              <td><span class="hl">Điều chỉnh tăng tỷ giá THB</span></td>
+            </tr>
+            <tr>
+              <td><b>SGD</b></td>
+              <td><b>1.34</b></td>
+              <td>2026-07-01</td>
+              <td>Tỷ giá Đô Singapore</td>
+            </tr>
+            <tr>
+              <td><b>USD</b></td>
+              <td><b>1.00</b></td>
+              <td>2020-01-01</td>
+              <td>Đồng tiền cơ sở</td>
+            </tr>
+          </table>
+          <h3 style="margin-top:8px">Cú pháp ASOF JOIN trong dbt</h3>
+          <pre><span class="k">ASOF LEFT JOIN</span> {{ ref(<span class="g">'fx_rates'</span>) }} fx
   <span class="k">ON</span>  b.currency = fx.currency
  <span class="k">AND</span> b.booked_date &gt;= fx.valid_from</pre>
-    </div>
-    <div>
-      <h3>Kết quả quy đổi USD thực tế cho 6 Bookings</h3>
-      <table class="table-compact">
-        <tr><th>Mã đơn</th><th>Ngày đặt</th><th>Tiền gốc</th><th>Tỷ giá áp dụng</th><th>Thành tiền (amount_usd)</th></tr>
-        <tr><td><code>BK-001</code></td><td>2026-05-01</td><td>24,500,000 VND</td><td><b>24,500</b> (trước 01/07)</td><td><b>$1,000.00 USD</b></td></tr>
-        <tr><td><code>BK-002</code></td><td>2026-08-01</td><td>25,500,000 VND</td><td><b>25,500</b> (sau 01/07)</td><td><b>$1,000.00 USD</b></td></tr>
-        <tr><td><code>BK-003</code></td><td>2026-08-20</td><td>350.00 USD</td><td><b>1.00</b> (cơ sở)</td><td><b>$350.00 USD</b></td></tr>
-        <tr><td><code>BK-005</code></td><td>2026-08-10</td><td>72,000 THB</td><td><b>36.00</b> (sau 01/07)</td><td><b>$2,000.00 USD</b></td></tr>
-        <tr><td><code>BK-006</code></td><td>2026-08-12</td><td>500.00 USD</td><td><b>1.00</b> (cơ sở)</td><td><b>$500.00 USD</b> (Huỷ)</td></tr>
-        <tr><td><code>BK-007</code></td><td>2026-08-15</td><td>1,340 SGD</td><td><b>1.34</b> (chuẩn)</td><td><b>$1,000.00 USD</b></td></tr>
-      </table>
-      <div class="card small" style="margin-top:10px">
-        <b>💡 Điểm mấu chốt:</b>
-        BK-001 và BK-002 cùng trị giá 1,000 USD nhưng do đặt ở 2 thời điểm khác nhau nên tự động ăn khớp 2 tỷ giá VND khác nhau (24,500 vs 25,500) mà không cần can thiệp thủ công.
+        </div>
+        <div>
+          <h3>Kết quả quy đổi USD thực tế cho 6 Bookings</h3>
+          <table class="table-compact">
+            <tr>
+              <th>Mã đơn</th>
+              <th>Ngày đặt</th>
+              <th>Tiền gốc</th>
+              <th>Tỷ giá áp dụng</th>
+              <th>Thành tiền (amount_usd)</th>
+            </tr>
+            <tr>
+              <td><code>BK-001</code></td>
+              <td>2026-05-01</td>
+              <td>24,500,000 VND</td>
+              <td><b>24,500</b> (trước 01/07)</td>
+              <td><b>$1,000.00 USD</b></td>
+            </tr>
+            <tr>
+              <td><code>BK-002</code></td>
+              <td>2026-08-01</td>
+              <td>25,500,000 VND</td>
+              <td><b>25,500</b> (sau 01/07)</td>
+              <td><b>$1,000.00 USD</b></td>
+            </tr>
+            <tr>
+              <td><code>BK-003</code></td>
+              <td>2026-08-20</td>
+              <td>350.00 USD</td>
+              <td><b>1.00</b> (cơ sở)</td>
+              <td><b>$350.00 USD</b></td>
+            </tr>
+            <tr>
+              <td><code>BK-005</code></td>
+              <td>2026-08-10</td>
+              <td>72,000 THB</td>
+              <td><b>36.00</b> (sau 01/07)</td>
+              <td><b>$2,000.00 USD</b></td>
+            </tr>
+            <tr>
+              <td><code>BK-006</code></td>
+              <td>2026-08-12</td>
+              <td>500.00 USD</td>
+              <td><b>1.00</b> (cơ sở)</td>
+              <td><b>$500.00 USD</b> (Huỷ)</td>
+            </tr>
+            <tr>
+              <td><code>BK-007</code></td>
+              <td>2026-08-15</td>
+              <td>1,340 SGD</td>
+              <td><b>1.34</b> (chuẩn)</td>
+              <td><b>$1,000.00 USD</b></td>
+            </tr>
+          </table>
+          <div class="card small" style="margin-top:10px">
+            <b>💡 Điểm mấu chốt:</b>
+            BK-001 và BK-002 cùng trị giá 1,000 USD nhưng do đặt ở 2 thời điểm khác nhau nên tự động ăn khớp 2 tỷ giá
+            VND khác nhau (24,500 vs 25,500) mà không cần can thiệp thủ công.
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
-  <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
-</section>
+      <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
+    </section>
 
-<!-- 14. STAR SCHEMA -->
-<section class="slide">
-  <h2>Mô hình Star Schema (ClickHouse + dbt)</h2>
-  <p class="sub">Mô hình hình sao chuẩn (không dùng SCD2), tối ưu hoá tốc độ truy vấn phân tích OLAP</p>
-  <div class="grid2">
-    <div>
-      <div class="card" style="border-left:5px solid var(--gold);margin-bottom:12px">
-        <h3 style="color:var(--gold)">⭐ Fact trung tâm: <code>fact_bookings</code></h3>
-        <p class="small"><b>Grain</b>: 1 dòng cho mỗi booking hợp lệ (tổng cộng 6 dòng).</p>
-        <ul class="small" style="margin-top:4px">
-          <li><code>booking_id</code>: Natural Key</li>
-          <li><code>hotel_id</code> &rarr; kết nối <code>dim_hotels</code></li>
-          <li><code>user_id</code> &rarr; kết nối <code>dim_customers</code></li>
-          <li><code>channel_id</code> &rarr; kết nối <code>dim_channels</code></li>
-          <li><code>booked_date</code> &rarr; kết nối <code>dim_dates</code></li>
-          <li><code>nights</code>, <code>total_amount</code>, <code>currency</code>, <code>amount_usd</code></li>
-          <li><code>booking_status</code>, <code>is_cancelled</code> (true nếu huỷ)</li>
-        </ul>
+    <!-- 14. STAR SCHEMA -->
+    <section class="slide">
+      <h2>Mô hình Star Schema (ClickHouse + dbt)</h2>
+      <p class="sub">Mô hình hình sao chuẩn (không dùng SCD2), tối ưu hoá tốc độ truy vấn phân tích OLAP</p>
+      <div class="grid2">
+        <div>
+          <div class="card" style="border-left:5px solid var(--gold);margin-bottom:12px">
+            <h3 style="color:var(--gold)">⭐ Fact trung tâm: <code>fact_bookings</code></h3>
+            <p class="small"><b>Grain</b>: 1 dòng cho mỗi booking hợp lệ (tổng cộng 6 dòng).</p>
+            <ul class="small" style="margin-top:4px">
+              <li><code>booking_id</code>: Natural Key</li>
+              <li><code>hotel_id</code> &rarr; kết nối <code>dim_hotels</code></li>
+              <li><code>user_id</code> &rarr; kết nối <code>dim_customers</code></li>
+              <li><code>channel_id</code> &rarr; kết nối <code>dim_channels</code></li>
+              <li><code>booked_date</code> &rarr; kết nối <code>dim_dates</code></li>
+              <li><code>nights</code>, <code>total_amount</code>, <code>currency</code>, <code>amount_usd</code></li>
+              <li><code>booking_status</code>, <code>is_cancelled</code> (true nếu huỷ)</li>
+            </ul>
+          </div>
+          <div class="card" style="border-left:5px solid var(--accent)">
+            <h3 style="color:var(--accent)">📊 Fact phụ trợ</h3>
+            <p class="small"><b><code>fact_payments</code></b>: 5 dòng giao dịch, ghi nhận số tiền thanh toán và khoản
+              hoàn tiền <code>refund_amount = $500</code> cho đơn BK-006.</p>
+            <p class="small" style="margin-top:4px"><b><code>fact_web_sessions</code></b>: 3 session tổng hợp từ 5
+              clickstream events, xác định tỷ lệ chuyển đổi từ tìm kiếm sang đặt phòng.</p>
+          </div>
+        </div>
+        <div>
+          <h3>Các bảng Dimension chuẩn</h3>
+          <table class="table-compact">
+            <tr>
+              <th>Dimension</th>
+              <th>Khoá chính</th>
+              <th>Các thuộc tính chính</th>
+            </tr>
+            <tr>
+              <td><b><code>dim_hotels</code></b></td>
+              <td><code>hotel_id</code></td>
+              <td>name, tier, star_rating, city, country, region, total_rooms, facilities</td>
+            </tr>
+            <tr>
+              <td><b><code>dim_customers</code></b></td>
+              <td><code>user_id</code></td>
+              <td>email_hash, phone_hash, country, user_segment, loyalty_tier</td>
+            </tr>
+            <tr>
+              <td><b><code>dim_channels</code></b></td>
+              <td><code>channel_id</code></td>
+              <td>channel_name (<code>Mobile App</code>, <code>Web</code>, <code>Partner API</code>, <code>Other</code>)
+              </td>
+            </tr>
+            <tr>
+              <td><b><code>dim_dates</code></b></td>
+              <td><code>date_id</code></td>
+              <td>date, year, quarter, month, day, is_weekend, season</td>
+            </tr>
+          </table>
+          <div class="card small" style="margin-top:14px">
+            <h3>Ưu điểm của mô hình tinh giản</h3>
+            <ul>
+              <li>Không cần xử lý khoảng hiệu lực phức tạp (valid_from/valid_to của SCD2).</li>
+              <li>Surrogate Key trực tiếp dựa trên Natural Key &rarr; Truy vấn trực quan, đơn giản.</li>
+              <li>Dễ dàng mở rộng cho các hệ thống BI như Superset, Metabase, PowerBI.</li>
+            </ul>
+          </div>
+        </div>
       </div>
-      <div class="card" style="border-left:5px solid var(--accent)">
-        <h3 style="color:var(--accent)">📊 Fact phụ trợ</h3>
-        <p class="small"><b><code>fact_payments</code></b>: 5 dòng giao dịch, ghi nhận số tiền thanh toán và khoản hoàn tiền <code>refund_amount = $500</code> cho đơn BK-006.</p>
-        <p class="small" style="margin-top:4px"><b><code>fact_web_sessions</code></b>: 3 session tổng hợp từ 5 clickstream events, xác định tỷ lệ chuyển đổi từ tìm kiếm sang đặt phòng.</p>
+      <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
+    </section>
+
+    <!-- 15. TRACE CASES -->
+    <section class="slide">
+      <h2>Theo dấu luồng dữ liệu (End-to-End Trace)</h2>
+      <p class="sub">Minh hoạ đường đi của 3 ca dữ liệu tiêu biểu từ Raw &rarr; Bronze &rarr; Silver &rarr; Fact &rarr;
+        Report</p>
+      <div class="grid3">
+        <div class="card small" style="border-top:4px solid var(--ok)">
+          <h3 style="color:var(--ok)">Ca 1: Thành công &amp; Đổi tỷ giá</h3>
+          <p><b>Mã</b>: <code>BK-DEMO-001</code> (CSV)</p>
+          <hr style="margin:6px 0;border:0;border-top:1px solid var(--line)">
+          <p><b>1. Raw</b>: <code>" 24,500,000 VND "</code>, status <code>confirm</code>, channel
+            <code>app_android</code>, ngày 2026-05-01.
+          </p>
+          <p><b>2. Bronze</b>: Lưu nguyên chuỗi + metadata.</p>
+          <p><b>3. Silver</b>: Ép tiền <code>24500000.00</code>, status <code>CONFIRMED</code>, channel
+            <code>Mobile App</code>, nights <code>4</code>.
+          </p>
+          <p><b>4. Fact</b>: Khớp tỷ giá cũ <code>24,500</code> &rarr; <code>amount_usd = $1,000.00</code>.</p>
+          <p><b>5. Report</b>: Cộng <b>$1,000.00</b> vào doanh thu xác nhận của VN - Mobile App.</p>
+        </div>
+        <div class="card small" style="border-top:4px solid var(--rejected)">
+          <h3 style="color:var(--rejected)">Ca 2: Đơn huỷ &amp; Hoàn tiền</h3>
+          <p><b>Mã</b>: <code>BK-DEMO-006</code> (XML)</p>
+          <hr style="margin:6px 0;border:0;border-top:1px solid var(--line)">
+          <p><b>1. Raw</b>: XML <code>$500.00</code> USD, status <code>CANCELLED</code>, kênh <code>web</code>.</p>
+          <p><b>2. Bronze</b>: Union cùng CSV vào Bronze.</p>
+          <p><b>3. Silver</b>: Tiền <code>500.00</code>, status <code>CANCELLED</code>.</p>
+          <p><b>4. Fact</b>: Gắn cờ <code>is_cancelled = true</code>. Fact Payments ghi nhận
+            <code>refund_amount = 500.00</code>.
+          </p>
+          <p><b>5. Report</b>: <b>Không cộng</b> vào confirmed_revenue, đẩy tỷ lệ huỷ VN - Web lên <b>50%</b>.</p>
+        </div>
+        <div class="card small" style="border-top:4px solid var(--quar)">
+          <h3 style="color:var(--quar)">Ca 3: Lỗi logic bị cách ly</h3>
+          <p><b>Mã</b>: <code>BK-DEMO-004</code> (CSV)</p>
+          <hr style="margin:6px 0;border:0;border-top:1px solid var(--line)">
+          <p><b>1. Raw</b>: Checkin <code>09-10</code>, Checkout <code>09-08</code>.</p>
+          <p><b>2. Bronze</b>: Đọc bình thường vào Bronze.</p>
+          <p><b>3. Silver DQ Check</b>: Tính <code>nights = -2</code> &le; 0 &rarr; Vi phạm quy tắc DQ.</p>
+          <p><b>4. Quarantine</b>: Bị chặn, đẩy vào <code>quarantine/bookings/</code> với lý do
+            <code>NON_POSITIVE_NIGHTS</code>.
+          </p>
+          <p><b>5. Warehouse</b>: Hoàn toàn <b>không xuất hiện</b> trong Staging, Fact và Report.</p>
+        </div>
       </div>
-    </div>
-    <div>
-      <h3>Các bảng Dimension chuẩn</h3>
-      <table class="table-compact">
-        <tr><th>Dimension</th><th>Khoá chính</th><th>Các thuộc tính chính</th></tr>
-        <tr><td><b><code>dim_hotels</code></b></td><td><code>hotel_id</code></td><td>name, tier, star_rating, city, country, region, total_rooms, facilities</td></tr>
-        <tr><td><b><code>dim_customers</code></b></td><td><code>user_id</code></td><td>email_hash, phone_hash, country, user_segment, loyalty_tier</td></tr>
-        <tr><td><b><code>dim_channels</code></b></td><td><code>channel_id</code></td><td>channel_name (<code>Mobile App</code>, <code>Web</code>, <code>Partner API</code>, <code>Other</code>)</td></tr>
-        <tr><td><b><code>dim_dates</code></b></td><td><code>date_id</code></td><td>date, year, quarter, month, day, is_weekend, season</td></tr>
-      </table>
-      <div class="card small" style="margin-top:14px">
-        <h3>Ưu điểm của mô hình tinh giản</h3>
-        <ul>
-          <li>Không cần xử lý khoảng hiệu lực phức tạp (valid_from/valid_to của SCD2).</li>
-          <li>Surrogate Key trực tiếp dựa trên Natural Key &rarr; Truy vấn trực quan, đơn giản.</li>
-          <li>Dễ dàng mở rộng cho các hệ thống BI như Superset, Metabase, PowerBI.</li>
-        </ul>
+      <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
+    </section>
+
+    <!-- 16. OUTPUT REPORTS -->
+    <section class="slide">
+      <h2>Dữ liệu đầu ra: Báo cáo phân tích (DBT Marts)</h2>
+      <p class="sub">Kết quả tổng hợp tự động từ ClickHouse Data Marts phục vụ Superset Dashboard</p>
+      <div class="grid2">
+        <div>
+          <h3>Báo cáo 1: Doanh thu theo Kênh &amp; Quốc gia (<code>rpt_daily_revenue</code>)</h3>
+          <table class="table-compact">
+            <tr>
+              <th>Quốc gia</th>
+              <th>Phân khúc KS</th>
+              <th>Kênh bán</th>
+              <th>Tổng đơn</th>
+              <th>Huỷ</th>
+              <th>Tỷ lệ huỷ</th>
+              <th>Doanh thu xác nhận</th>
+            </tr>
+            <tr>
+              <td><b>VN</b></td>
+              <td>luxury</td>
+              <td><b>Mobile App</b></td>
+              <td>1</td>
+              <td>0</td>
+              <td>0.0%</td>
+              <td><b>$1,000.00 USD</b></td>
+            </tr>
+            <tr>
+              <td><b>VN</b></td>
+              <td>luxury</td>
+              <td><b>Web</b></td>
+              <td>2</td>
+              <td>1</td>
+              <td><span class="hl-bad">50.0%</span></td>
+              <td><b>$1,000.00 USD</b></td>
+            </tr>
+            <tr>
+              <td><b>TH</b></td>
+              <td>boutique</td>
+              <td><b>Web</b></td>
+              <td>1</td>
+              <td>0</td>
+              <td>0.0%</td>
+              <td><b>$350.00 USD</b></td>
+            </tr>
+            <tr>
+              <td><b>TH</b></td>
+              <td>boutique</td>
+              <td><b>Partner API</b></td>
+              <td>1</td>
+              <td>0</td>
+              <td>0.0%</td>
+              <td><b>$2,000.00 USD</b></td>
+            </tr>
+            <tr>
+              <td><b>SG</b></td>
+              <td>luxury</td>
+              <td><b>Mobile App</b></td>
+              <td>1</td>
+              <td>0</td>
+              <td>0.0%</td>
+              <td><b>$1,000.00 USD</b></td>
+            </tr>
+          </table>
+          <p class="small muted" style="margin-top:6px"><i>Giải thích:</i> Kênh VN - Web có 2 đơn (BK-002 $1,000 và
+            BK-006 $500), nhưng do BK-006 bị huỷ nên doanh thu thực thu chỉ là $1,000 USD và tỷ lệ huỷ là 50%.</p>
+        </div>
+        <div>
+          <h3>Báo cáo 2: Hiệu suất &amp; Hoàn tiền Khách sạn (<code>rpt_hotel_performance</code>)</h3>
+          <table class="table-compact">
+            <tr>
+              <th>Mã KS</th>
+              <th>Tên khách sạn</th>
+              <th>Sao</th>
+              <th>Đơn</th>
+              <th>Huỷ</th>
+              <th>Doanh thu USD</th>
+              <th>Thanh toán</th>
+              <th>Hoàn trả</th>
+            </tr>
+            <tr>
+              <td><code>HTL-001</code></td>
+              <td>Da Nang Luxury Resort</td>
+              <td>5★</td>
+              <td>3</td>
+              <td>1</td>
+              <td><b>$2,000.00</b></td>
+              <td>$2,500.00</td>
+              <td><span class="hl-bad">$500.00</span></td>
+            </tr>
+            <tr>
+              <td><code>HTL-002</code></td>
+              <td>Bangkok Riverside Hotel</td>
+              <td>4★</td>
+              <td>2</td>
+              <td>0</td>
+              <td><b>$2,350.00</b></td>
+              <td>$2,350.00</td>
+              <td>$0.00</td>
+            </tr>
+            <tr>
+              <td><code>HTL-003</code></td>
+              <td>Singapore Grand Central</td>
+              <td>5★</td>
+              <td>1</td>
+              <td>0</td>
+              <td><b>$1,000.00</b></td>
+              <td>$1,000.00</td>
+              <td>$0.00</td>
+            </tr>
+          </table>
+          <div class="card small" style="margin-top:8px">
+            <ul>
+              <li><b>HTL-001</b>: Thu 2 đơn xác nhận ($1,000 + $1,000 = $2,000), 1 đơn huỷ $500 phát sinh hoàn trả $500
+                qua cổng Stripe.</li>
+              <li><b>HTL-004 &amp; HTL-005</b>: Bị cách ly ngay tại Quarantine, tuyệt đối không gây sai lệch dữ liệu báo
+                cáo.</li>
+            </ul>
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
-  <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
-</section>
+      <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
+    </section>
 
-<!-- 15. TRACE CASES -->
-<section class="slide">
-  <h2>Theo dấu luồng dữ liệu (End-to-End Trace)</h2>
-  <p class="sub">Minh hoạ đường đi của 3 ca dữ liệu tiêu biểu từ Raw &rarr; Bronze &rarr; Silver &rarr; Fact &rarr; Report</p>
-  <div class="grid3">
-    <div class="card small" style="border-top:4px solid var(--ok)">
-      <h3 style="color:var(--ok)">Ca 1: Thành công &amp; Đổi tỷ giá</h3>
-      <p><b>Mã</b>: <code>BK-DEMO-001</code> (CSV)</p>
-      <hr style="margin:6px 0;border:0;border-top:1px solid var(--line)">
-      <p><b>1. Raw</b>: <code>" 24,500,000 VND "</code>, status <code>confirm</code>, channel <code>app_android</code>, ngày 2026-05-01.</p>
-      <p><b>2. Bronze</b>: Lưu nguyên chuỗi + metadata.</p>
-      <p><b>3. Silver</b>: Ép tiền <code>24500000.00</code>, status <code>CONFIRMED</code>, channel <code>Mobile App</code>, nights <code>4</code>.</p>
-      <p><b>4. Fact</b>: Khớp tỷ giá cũ <code>24,500</code> &rarr; <code>amount_usd = $1,000.00</code>.</p>
-      <p><b>5. Report</b>: Cộng <b>$1,000.00</b> vào doanh thu xác nhận của VN - Mobile App.</p>
-    </div>
-    <div class="card small" style="border-top:4px solid var(--rejected)">
-      <h3 style="color:var(--rejected)">Ca 2: Đơn huỷ &amp; Hoàn tiền</h3>
-      <p><b>Mã</b>: <code>BK-DEMO-006</code> (XML)</p>
-      <hr style="margin:6px 0;border:0;border-top:1px solid var(--line)">
-      <p><b>1. Raw</b>: XML <code>$500.00</code> USD, status <code>CANCELLED</code>, kênh <code>web</code>.</p>
-      <p><b>2. Bronze</b>: Union cùng CSV vào Bronze.</p>
-      <p><b>3. Silver</b>: Tiền <code>500.00</code>, status <code>CANCELLED</code>.</p>
-      <p><b>4. Fact</b>: Gắn cờ <code>is_cancelled = true</code>. Fact Payments ghi nhận <code>refund_amount = 500.00</code>.</p>
-      <p><b>5. Report</b>: <b>Không cộng</b> vào confirmed_revenue, đẩy tỷ lệ huỷ VN - Web lên <b>50%</b>.</p>
-    </div>
-    <div class="card small" style="border-top:4px solid var(--quar)">
-      <h3 style="color:var(--quar)">Ca 3: Lỗi logic bị cách ly</h3>
-      <p><b>Mã</b>: <code>BK-DEMO-004</code> (CSV)</p>
-      <hr style="margin:6px 0;border:0;border-top:1px solid var(--line)">
-      <p><b>1. Raw</b>: Checkin <code>09-10</code>, Checkout <code>09-08</code>.</p>
-      <p><b>2. Bronze</b>: Đọc bình thường vào Bronze.</p>
-      <p><b>3. Silver DQ Check</b>: Tính <code>nights = -2</code> &le; 0 &rarr; Vi phạm quy tắc DQ.</p>
-      <p><b>4. Quarantine</b>: Bị chặn, đẩy vào <code>quarantine/bookings/</code> với lý do <code>NON_POSITIVE_NIGHTS</code>.</p>
-      <p><b>5. Warehouse</b>: Hoàn toàn <b>không xuất hiện</b> trong Staging, Fact và Report.</p>
-    </div>
-  </div>
-  <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
-</section>
+    <!-- 17. MASTER RECONCILIATION MATRIX -->
+    <section class="slide">
+      <h2>Ma trận đối soát toàn diện: 26 ca đầu vào &rarr; đầu ra</h2>
+      <p class="sub">Đối soát toàn bộ 26 bản ghi từ file thô đến bảng đích cuối cùng trong hệ thống</p>
+      <table class="table-compact" style="font-size:12px">
+        <tr>
+          <th>Thực thể</th>
+          <th>Số dòng thô</th>
+          <th>Phân loại ca kiểm thử đầu vào</th>
+          <th>Kết quả tầng Bronze</th>
+          <th>Kết quả tầng Silver</th>
+          <th>Đích cuối cùng tại DWH</th>
+        </tr>
+        <tr>
+          <td><b>Bookings</b></td>
+          <td>10 dòng (6 CSV + 4 XML)</td>
+          <td>
+            • 4 ca tiền bẩn &amp; status thường (BK-001, 002, 005, 007)<br>
+            • 1 ca đơn huỷ có refund (BK-006)<br>
+            • 1 ca cập nhật mới nhất (BK-003 v2)<br>
+            • 1 ca trùng mã cũ (BK-003 v1)<br>
+            • 1 ca checkout &lt; checkin (BK-004)<br>
+            • 1 ca thiếu mã (NULL)<br>
+            • 1 ca tiền dạng chữ voucher (BK-008)
+          </td>
+          <td><b>10 dòng</b> (Union Parquet)</td>
+          <td>
+            <span class="hl-ok"><b>6 dòng hợp lệ</b></span><br><br>
+            <span class="hl-bad"><b>4 dòng Quarantine:</b></span><br>
+            - DUPLICATE_KEY<br>
+            - NON_POSITIVE_NIGHTS<br>
+            - MISSING_BOOKING_ID<br>
+            - INVALID_AMOUNT
+          </td>
+          <td>
+            <b>fact_bookings</b> (6 dòng)<br>
+            &bull; 5 đơn xác nhận ($5,350 USD)<br>
+            &bull; 1 đơn huỷ ($500 USD)<br>
+            &bull; <b>rpt_daily_revenue</b><br>
+            &bull; <b>rpt_hotel_performance</b>
+          </td>
+        </tr>
+        <tr>
+          <td><b>Hotels</b></td>
+          <td>5 dòng (XML)</td>
+          <td>• 3 KS hợp lệ (HTL-001, 002, 003)<br>• 1 KS 7 sao (HTL-004)<br>• 1 KS số phòng âm (HTL-005)</td>
+          <td><b>5 dòng</b> Parquet</td>
+          <td><span class="hl-ok">3 dòng hợp lệ</span><br><span class="hl-bad">2 dòng Quarantine</span> (INVALID_STAR,
+            INVALID_ROOMS)</td>
+          <td><b>dim_hotels</b> (3 KS sạch)</td>
+        </tr>
+        <tr>
+          <td><b>Customers</b></td>
+          <td>5 dòng (CSV)</td>
+          <td>• 3 khách có PII (USR-001, 002, 003)<br>• 1 khách thiếu email (USR-004)<br>• 1 khách thiếu SĐT (USR-005)
+          </td>
+          <td><b>5 dòng</b> Parquet</td>
+          <td><span class="hl-ok">4 dòng hợp lệ</span> (Drop name, SHA-256 hash)<br><span class="hl-bad">1 dòng
+              Quarantine</span> (MISSING_EMAIL)</td>
+          <td><b>dim_customers</b> (4 khách)</td>
+        </tr>
+        <tr>
+          <td><b>Payments</b></td>
+          <td>6 dòng (CSV)</td>
+          <td>• 5 GD chuẩn &amp; 1 refund 100% (PAY-001..005)<br>• 1 GD tiền rác (PAY-006)</td>
+          <td><b>6 dòng</b> Parquet</td>
+          <td><span class="hl-ok">5 dòng hợp lệ</span><br><span class="hl-bad">1 dòng Quarantine</span> (INVALID_AMOUNT)
+          </td>
+          <td><b>fact_payments</b> (5 giao dịch)</td>
+        </tr>
+      </table>
+      <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
+    </section>
 
-<!-- 16. OUTPUT REPORTS -->
-<section class="slide">
-  <h2>Dữ liệu đầu ra: Báo cáo phân tích (DBT Marts)</h2>
-  <p class="sub">Kết quả tổng hợp tự động từ ClickHouse Data Marts phục vụ Superset Dashboard</p>
-  <div class="grid2">
-    <div>
-      <h3>Báo cáo 1: Doanh thu theo Kênh &amp; Quốc gia (<code>rpt_daily_revenue</code>)</h3>
-      <table class="table-compact">
-        <tr><th>Quốc gia</th><th>Phân khúc KS</th><th>Kênh bán</th><th>Tổng đơn</th><th>Huỷ</th><th>Tỷ lệ huỷ</th><th>Doanh thu xác nhận</th></tr>
-        <tr><td><b>VN</b></td><td>luxury</td><td><b>Mobile App</b></td><td>1</td><td>0</td><td>0.0%</td><td><b>$1,000.00 USD</b></td></tr>
-        <tr><td><b>VN</b></td><td>luxury</td><td><b>Web</b></td><td>2</td><td>1</td><td><span class="hl-bad">50.0%</span></td><td><b>$1,000.00 USD</b></td></tr>
-        <tr><td><b>TH</b></td><td>boutique</td><td><b>Web</b></td><td>1</td><td>0</td><td>0.0%</td><td><b>$350.00 USD</b></td></tr>
-        <tr><td><b>TH</b></td><td>boutique</td><td><b>Partner API</b></td><td>1</td><td>0</td><td>0.0%</td><td><b>$2,000.00 USD</b></td></tr>
-        <tr><td><b>SG</b></td><td>luxury</td><td><b>Mobile App</b></td><td>1</td><td>0</td><td>0.0%</td><td><b>$1,000.00 USD</b></td></tr>
-      </table>
-      <p class="small muted" style="margin-top:6px"><i>Giải thích:</i> Kênh VN - Web có 2 đơn (BK-002 $1,000 và BK-006 $500), nhưng do BK-006 bị huỷ nên doanh thu thực thu chỉ là $1,000 USD và tỷ lệ huỷ là 50%.</p>
-    </div>
-    <div>
-      <h3>Báo cáo 2: Hiệu suất &amp; Hoàn tiền Khách sạn (<code>rpt_hotel_performance</code>)</h3>
-      <table class="table-compact">
-        <tr><th>Mã KS</th><th>Tên khách sạn</th><th>Sao</th><th>Đơn</th><th>Huỷ</th><th>Doanh thu USD</th><th>Thanh toán</th><th>Hoàn trả</th></tr>
-        <tr><td><code>HTL-001</code></td><td>Da Nang Luxury Resort</td><td>5★</td><td>3</td><td>1</td><td><b>$2,000.00</b></td><td>$2,500.00</td><td><span class="hl-bad">$500.00</span></td></tr>
-        <tr><td><code>HTL-002</code></td><td>Bangkok Riverside Hotel</td><td>4★</td><td>2</td><td>0</td><td><b>$2,350.00</b></td><td>$2,350.00</td><td>$0.00</td></tr>
-        <tr><td><code>HTL-003</code></td><td>Singapore Grand Central</td><td>5★</td><td>1</td><td>0</td><td><b>$1,000.00</b></td><td>$1,000.00</td><td>$0.00</td></tr>
-      </table>
-      <div class="card small" style="margin-top:8px">
-        <ul>
-          <li><b>HTL-001</b>: Thu 2 đơn xác nhận ($1,000 + $1,000 = $2,000), 1 đơn huỷ $500 phát sinh hoàn trả $500 qua cổng Stripe.</li>
-          <li><b>HTL-004 &amp; HTL-005</b>: Bị cách ly ngay tại Quarantine, tuyệt đối không gây sai lệch dữ liệu báo cáo.</li>
-        </ul>
+    <!-- 18. DQ & AUDIT -->
+    <section class="slide">
+      <h2>Chất lượng dữ liệu &amp; Giám sát (Observability)</h2>
+      <p class="sub">Chiến lược "Phòng thủ theo chiều sâu" (Defense-in-depth) bảo vệ tính toàn vẹn của dữ liệu</p>
+      <div class="grid4" style="margin-bottom:14px">
+        <div class="card small">
+          <h3><span class="tag" style="background:var(--bronze)">1. Bronze</span></h3>
+          <ul>
+            <li>Schema Contract: bắt buộc đủ 12 cột.</li>
+            <li>Phát hiện Schema Drift.</li>
+            <li>Dòng JSON hỏng &rarr; Rejected.</li>
+          </ul>
+        </div>
+        <div class="card small">
+          <h3><span class="tag" style="background:var(--silver)">2. Silver</span></h3>
+          <ul>
+            <li>8 DQ Rules nghiệp vụ.</li>
+            <li>Dedup bằng Window Function.</li>
+            <li>Circuit Breaker (&gt;20% lỗi &rarr; ngắt).</li>
+          </ul>
+        </div>
+        <div class="card small">
+          <h3><span class="tag" style="background:#d97706">3. Staging</span></h3>
+          <ul>
+            <li>Contract cột Silver &harr; ClickHouse.</li>
+            <li><b>Reconciliation</b> số dòng.</li>
+            <li>Idempotent partition delete.</li>
+          </ul>
+        </div>
+        <div class="card small">
+          <h3><span class="tag" style="background:var(--gold)">4. Gold dbt test</span></h3>
+          <ul>
+            <li>unique, not_null khoá chính.</li>
+            <li>accepted_values (status/channel).</li>
+            <li>relationships (khoá ngoại).</li>
+          </ul>
+        </div>
       </div>
-    </div>
-  </div>
-  <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
-</section>
-
-<!-- 17. MASTER RECONCILIATION MATRIX -->
-<section class="slide">
-  <h2>Ma trận đối soát toàn diện: 26 ca đầu vào &rarr; đầu ra</h2>
-  <p class="sub">Đối soát toàn bộ 26 bản ghi từ file thô đến bảng đích cuối cùng trong hệ thống</p>
-  <table class="table-compact" style="font-size:12px">
-    <tr><th>Thực thể</th><th>Số dòng thô</th><th>Phân loại ca kiểm thử đầu vào</th><th>Kết quả tầng Bronze</th><th>Kết quả tầng Silver</th><th>Đích cuối cùng tại DWH</th></tr>
-    <tr><td><b>Bookings</b></td><td>10 dòng (6 CSV + 4 XML)</td><td>
-      • 4 ca tiền bẩn &amp; status thường (BK-001, 002, 005, 007)<br>
-      • 1 ca đơn huỷ có refund (BK-006)<br>
-      • 1 ca cập nhật mới nhất (BK-003 v2)<br>
-      • 1 ca trùng mã cũ (BK-003 v1)<br>
-      • 1 ca checkout &lt; checkin (BK-004)<br>
-      • 1 ca thiếu mã (NULL)<br>
-      • 1 ca tiền dạng chữ voucher (BK-008)
-    </td><td><b>10 dòng</b> (Union Parquet)</td><td>
-      <span class="hl-ok"><b>6 dòng hợp lệ</b></span><br><br>
-      <span class="hl-bad"><b>4 dòng Quarantine:</b></span><br>
-      - DUPLICATE_KEY<br>
-      - NON_POSITIVE_NIGHTS<br>
-      - MISSING_BOOKING_ID<br>
-      - INVALID_AMOUNT
-    </td><td>
-      <b>fact_bookings</b> (6 dòng)<br>
-      &bull; 5 đơn xác nhận ($5,350 USD)<br>
-      &bull; 1 đơn huỷ ($500 USD)<br>
-      &bull; <b>rpt_daily_revenue</b><br>
-      &bull; <b>rpt_hotel_performance</b>
-    </td></tr>
-    <tr><td><b>Hotels</b></td><td>5 dòng (XML)</td><td>• 3 KS hợp lệ (HTL-001, 002, 003)<br>• 1 KS 7 sao (HTL-004)<br>• 1 KS số phòng âm (HTL-005)</td><td><b>5 dòng</b> Parquet</td><td><span class="hl-ok">3 dòng hợp lệ</span><br><span class="hl-bad">2 dòng Quarantine</span> (INVALID_STAR, INVALID_ROOMS)</td><td><b>dim_hotels</b> (3 KS sạch)</td></tr>
-    <tr><td><b>Customers</b></td><td>5 dòng (CSV)</td><td>• 3 khách có PII (USR-001, 002, 003)<br>• 1 khách thiếu email (USR-004)<br>• 1 khách thiếu SĐT (USR-005)</td><td><b>5 dòng</b> Parquet</td><td><span class="hl-ok">4 dòng hợp lệ</span> (Drop name, SHA-256 hash)<br><span class="hl-bad">1 dòng Quarantine</span> (MISSING_EMAIL)</td><td><b>dim_customers</b> (4 khách)</td></tr>
-    <tr><td><b>Payments</b></td><td>6 dòng (CSV)</td><td>• 5 GD chuẩn &amp; 1 refund 100% (PAY-001..005)<br>• 1 GD tiền rác (PAY-006)</td><td><b>6 dòng</b> Parquet</td><td><span class="hl-ok">5 dòng hợp lệ</span><br><span class="hl-bad">1 dòng Quarantine</span> (INVALID_AMOUNT)</td><td><b>fact_payments</b> (5 giao dịch)</td></tr>
-  </table>
-  <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
-</section>
-
-<!-- 18. DQ & AUDIT -->
-<section class="slide">
-  <h2>Chất lượng dữ liệu &amp; Giám sát (Observability)</h2>
-  <p class="sub">Chiến lược "Phòng thủ theo chiều sâu" (Defense-in-depth) bảo vệ tính toàn vẹn của dữ liệu</p>
-  <div class="grid4" style="margin-bottom:14px">
-    <div class="card small"><h3><span class="tag" style="background:var(--bronze)">1. Bronze</span></h3><ul><li>Schema Contract: bắt buộc đủ 12 cột.</li><li>Phát hiện Schema Drift.</li><li>Dòng JSON hỏng &rarr; Rejected.</li></ul></div>
-    <div class="card small"><h3><span class="tag" style="background:var(--silver)">2. Silver</span></h3><ul><li>8 DQ Rules nghiệp vụ.</li><li>Dedup bằng Window Function.</li><li>Circuit Breaker (&gt;20% lỗi &rarr; ngắt).</li></ul></div>
-    <div class="card small"><h3><span class="tag" style="background:#d97706">3. Staging</span></h3><ul><li>Contract cột Silver &harr; ClickHouse.</li><li><b>Reconciliation</b> số dòng.</li><li>Idempotent partition delete.</li></ul></div>
-    <div class="card small"><h3><span class="tag" style="background:var(--gold)">4. Gold dbt test</span></h3><ul><li>unique, not_null khoá chính.</li><li>accepted_values (status/channel).</li><li>relationships (khoá ngoại).</li></ul></div>
-  </div>
-  <div class="grid2">
-    <div class="card small">
-      <h3>Đối soát số dòng thực tế</h3>
-      <table class="table-compact">
-        <tr><th>Layer</th><th>Tổng số bản ghi</th><th>Tỷ lệ sạch / Lỗi</th></tr>
-        <tr><td>Raw &rarr; Bronze</td><td>31 dòng đọc</td><td>100% thành công</td></tr>
-        <tr><td>Bronze &rarr; Silver</td><td>23 dòng sạch</td><td>74.2% sạch</td></tr>
-        <tr><td>Bronze &rarr; Quarantine</td><td>8 dòng cách ly</td><td>25.8% lỗi (có chủ đích)</td></tr>
-        <tr><td>Silver &rarr; ClickHouse</td><td>23 dòng nạp</td><td><b>Khớp 100%</b> (Reconciled)</td></tr>
-      </table>
-    </div>
-    <div>
-      <h3>Audit Log từ <code>analytics.pipeline_runs</code></h3>
-<pre style="font-size:12px"><span class="c">SELECT step_name, status, rows_processed FROM analytics.pipeline_runs</span>
+      <div class="grid2">
+        <div class="card small">
+          <h3>Đối soát số dòng thực tế</h3>
+          <table class="table-compact">
+            <tr>
+              <th>Layer</th>
+              <th>Tổng số bản ghi</th>
+              <th>Tỷ lệ sạch / Lỗi</th>
+            </tr>
+            <tr>
+              <td>Raw &rarr; Bronze</td>
+              <td>31 dòng đọc</td>
+              <td>100% thành công</td>
+            </tr>
+            <tr>
+              <td>Bronze &rarr; Silver</td>
+              <td>23 dòng sạch</td>
+              <td>74.2% sạch</td>
+            </tr>
+            <tr>
+              <td>Bronze &rarr; Quarantine</td>
+              <td>8 dòng cách ly</td>
+              <td>25.8% lỗi (có chủ đích)</td>
+            </tr>
+            <tr>
+              <td>Silver &rarr; ClickHouse</td>
+              <td>23 dòng nạp</td>
+              <td><b>Khớp 100%</b> (Reconciled)</td>
+            </tr>
+          </table>
+        </div>
+        <div>
+          <h3>Audit Log từ <code>analytics.pipeline_runs</code></h3>
+          <pre style="font-size:12px"><span class="c">SELECT step_name, status, rows_processed FROM analytics.pipeline_runs</span>
 upload_raw     <span class="g">SUCCESS</span>     6 files
 spark_bronze   <span class="g">SUCCESS</span>    31 rows  <span class="c">{"rejected_rows":0}</span>
 spark_silver   <span class="g">SUCCESS</span>    23 rows  <span class="c">{"quarantine":8, "dups":1}</span>
@@ -708,116 +1961,122 @@ load_staging   <span class="g">SUCCESS</span>    23 rows  <span class="c">{"reco
 dbt_seed       <span class="g">SUCCESS</span>    10 rows  <span class="c">{"seed":"fx_rates"}</span>
 dbt_run        <span class="g">SUCCESS</span>    11 models
 dbt_test       <span class="g">SUCCESS</span>    18 tests passed</pre>
-    </div>
-  </div>
-  <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
-</section>
+        </div>
+      </div>
+      <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
+    </section>
 
-<!-- 19. DEMO SCRIPT -->
-<section class="slide">
-  <h2>Kịch bản thực nghiệm trên Docker Compose</h2>
-  <p class="sub">Các bước chạy thực tế và câu lệnh kiểm chứng bằng ClickHouse SQL</p>
-  <div class="grid2">
-    <div>
-      <h3>1. Lệnh thực thi Pipeline</h3>
-<pre style="font-size:12px"><span class="c"># Chạy toàn bộ pipeline từ đầu đến cuối</span>
+    <!-- 19. DEMO SCRIPT -->
+    <section class="slide">
+      <h2>Kịch bản thực nghiệm trên Docker Compose</h2>
+      <p class="sub">Các bước chạy thực tế và câu lệnh kiểm chứng bằng ClickHouse SQL</p>
+      <div class="grid2">
+        <div>
+          <h3>1. Lệnh thực thi Pipeline</h3>
+          <pre style="font-size:12px"><span class="c"># Chạy toàn bộ pipeline từ đầu đến cuối</span>
 docker exec -it travelhub-pipeline \
   python3 /opt/scripts/run_pipeline.py <span class="k">2026-10-01</span>
 
 <span class="c"># Xem file trên Data Lake (SeaweedFS S3)</span>
 http://localhost:8888/buckets/travelhub-lake/quarantine/</pre>
-      <h3 style="margin-top:10px">2. Kiểm tra Staging &amp; Marts trên ClickHouse</h3>
-<pre style="font-size:12px"><span class="c">-- Đối soát doanh thu thực thu theo kênh</span>
+          <h3 style="margin-top:10px">2. Kiểm tra Staging &amp; Marts trên ClickHouse</h3>
+          <pre style="font-size:12px"><span class="c">-- Đối soát doanh thu thực thu theo kênh</span>
 <span class="k">SELECT</span> channel_name, confirmed_bookings, confirmed_revenue_usd
 <span class="k">FROM</span> analytics.rpt_daily_revenue;
 
 <span class="c">-- Kiểm tra bảo mật PII (chỉ có mã băm SHA-256)</span>
 <span class="k">SELECT</span> user_id, email_hash, phone_hash
 <span class="k">FROM</span> analytics.dim_customers;</pre>
-    </div>
-    <div class="card small">
-      <h3>🎯 6 Điểm nhấn khi thuyết trình / Demo</h3>
-      <ol style="padding-left:20px">
-        <li><b>Đa định dạng</b>: Trình chiếu file thô CSV và XML cùng được gộp mượt mà vào Bronze Parquet.</li>
-        <li><b>Cách ly lỗi</b>: Mở thư mục <code>quarantine/</code> chỉ ra 8 dòng lỗi kèm <code>_dq_reason</code> rõ ràng.</li>
-        <li><b>Bảo mật PII</b>: Chứng minh cột <code>full_name</code> đã biến mất, email/phone biến thành chuỗi hash SHA-256.</li>
-        <li><b>Tỷ giá ASOF</b>: Chỉ ra BK-001 ăn tỷ giá cũ (24,500) và BK-002 ăn tỷ giá mới (25,500).</li>
-        <li><b>Đơn huỷ &amp; Hoàn tiền</b>: Đơn BK-006 bị loại khỏi doanh thu confirmed, tỷ lệ huỷ phản ánh đúng 50%.</li>
-        <li><b>Reconciliation</b>: Số dòng đối soát giữa Silver và Staging khớp 100%.</li>
-      </ol>
-    </div>
+        </div>
+        <div class="card small">
+          <h3>🎯 6 Điểm nhấn khi thuyết trình / Demo</h3>
+          <ol style="padding-left:20px">
+            <li><b>Đa định dạng</b>: Trình chiếu file thô CSV và XML cùng được gộp mượt mà vào Bronze Parquet.</li>
+            <li><b>Cách ly lỗi</b>: Mở thư mục <code>quarantine/</code> chỉ ra 8 dòng lỗi kèm <code>_dq_reason</code> rõ
+              ràng.</li>
+            <li><b>Bảo mật PII</b>: Chứng minh cột <code>full_name</code> đã biến mất, email/phone biến thành chuỗi hash
+              SHA-256.</li>
+            <li><b>Tỷ giá ASOF</b>: Chỉ ra BK-001 ăn tỷ giá cũ (24,500) và BK-002 ăn tỷ giá mới (25,500).</li>
+            <li><b>Đơn huỷ &amp; Hoàn tiền</b>: Đơn BK-006 bị loại khỏi doanh thu confirmed, tỷ lệ huỷ phản ánh đúng
+              50%.</li>
+            <li><b>Reconciliation</b>: Số dòng đối soát giữa Silver và Staging khớp 100%.</li>
+          </ol>
+        </div>
+      </div>
+      <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
+    </section>
+
+    <!-- 20. CONCLUSION & Q&A -->
+    <section class="slide title" style="align-items:center;text-align:center">
+      <div class="tag" style="background:var(--ok);font-size:14px;margin-bottom:16px">HOÀN TẤT BÁO CÁO KIỂM THỬ</div>
+      <h1 style="font-size:56px">Tổng Kết &amp; Hỏi Đáp (Q&amp;A)</h1>
+      <p class="sub" style="font-size:22px;max-width:900px;margin:12px auto 24px">Bộ dữ liệu Sample Showcase đã chứng
+        minh pipeline xử lý trọn vẹn: Đa định dạng &rarr; Làm sạch &rarr; Khử trùng &rarr; Bảo mật PII &rarr; Quy đổi tỷ
+        giá ASOF &rarr; Star Schema &rarr; Báo cáo tin cậy</p>
+      <div class="pill-row" style="justify-content:center">
+        <span class="pill" style="background:var(--raw)">Raw (26)</span>
+        <span class="pill" style="background:var(--bronze)">Bronze (31)</span>
+        <span class="pill" style="background:var(--quar)">Quarantine (8)</span>
+        <span class="pill" style="background:var(--silver)">Silver (23)</span>
+        <span class="pill" style="background:var(--ch)">Staging (23)</span>
+        <span class="pill" style="background:var(--gold)">Fact / Dim</span>
+        <span class="pill" style="background:#20a7c9">BI Marts</span>
+      </div>
+      <div class="meta" style="margin-top:28px">Cảm ơn Thầy Cô và các bạn đã theo dõi!</div>
+    </section>
+
   </div>
-  <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
-</section>
 
-<!-- 20. CONCLUSION & Q&A -->
-<section class="slide title" style="align-items:center;text-align:center">
-  <div class="tag" style="background:var(--ok);font-size:14px;margin-bottom:16px">HOÀN TẤT BÁO CÁO KIỂM THỬ</div>
-  <h1 style="font-size:56px">Tổng Kết &amp; Hỏi Đáp (Q&amp;A)</h1>
-  <p class="sub" style="font-size:22px;max-width:900px;margin:12px auto 24px">Bộ dữ liệu Sample Showcase đã chứng minh pipeline xử lý trọn vẹn: Đa định dạng &rarr; Làm sạch &rarr; Khử trùng &rarr; Bảo mật PII &rarr; Quy đổi tỷ giá ASOF &rarr; Star Schema &rarr; Báo cáo tin cậy</p>
-  <div class="pill-row" style="justify-content:center">
-    <span class="pill" style="background:var(--raw)">Raw (26)</span>
-    <span class="pill" style="background:var(--bronze)">Bronze (31)</span>
-    <span class="pill" style="background:var(--quar)">Quarantine (8)</span>
-    <span class="pill" style="background:var(--silver)">Silver (23)</span>
-    <span class="pill" style="background:var(--ch)">Staging (23)</span>
-    <span class="pill" style="background:var(--gold)">Fact / Dim</span>
-    <span class="pill" style="background:#20a7c9">BI Marts</span>
+  <div id="nav">
+    <span id="cnt"></span>
+    <button onclick="go(-1)" title="Slide trước (Phím mũi tên trái)">◀</button>
+    <button onclick="go(1)" title="Slide sau (Phím mũi tên phải)">▶</button>
   </div>
-  <div class="meta" style="margin-top:28px">Cảm ơn Thầy Cô và các bạn đã theo dõi!</div>
-</section>
 
-</div>
+  <script>
+    const slides = [...document.querySelectorAll('.slide')];
+    let i = Math.max(0, Math.min(slides.length - 1, (parseInt(location.hash.slice(1)) || 1) - 1));
+    slides.forEach((s, k) => {
+      const p = s.querySelector('.pg');
+      if (p) p.textContent = (k + 1) + ' / ' + slides.length;
+    });
 
-<div id="nav">
-  <span id="cnt"></span>
-  <button onclick="go(-1)" title="Slide trước (Phím mũi tên trái)">◀</button>
-  <button onclick="go(1)" title="Slide sau (Phím mũi tên phải)">▶</button>
-</div>
-
-<script>
-  const slides = [...document.querySelectorAll('.slide')];
-  let i = Math.max(0, Math.min(slides.length - 1, (parseInt(location.hash.slice(1)) || 1) - 1));
-  slides.forEach((s, k) => {
-    const p = s.querySelector('.pg');
-    if (p) p.textContent = (k + 1) + ' / ' + slides.length;
-  });
-
-  function fit() {
-    const sc = Math.min(innerWidth / 1320, innerHeight / 760);
-    slides.forEach(s => s.style.transform = `scale(${sc})`);
-  }
-
-  function show() {
-    slides.forEach((s, k) => s.classList.toggle('active', k === i));
-    const cnt = document.getElementById('cnt');
-    if (cnt) cnt.textContent = `${i + 1} / ${slides.length}`;
-    history.replaceState(null, '', '#' + (i + 1));
-  }
-
-  function go(d) {
-    i = Math.max(0, Math.min(slides.length - 1, i + d));
-    show();
-  }
-
-  addEventListener('keydown', e => {
-    if (['ArrowRight', 'PageDown', ' ', 'Enter'].includes(e.key)) { e.preventDefault(); go(1); }
-    if (['ArrowLeft', 'PageUp', 'Backspace'].includes(e.key)) { e.preventDefault(); go(-1); }
-    if (e.key === 'Home') { i = 0; show(); }
-    if (e.key === 'End') { i = slides.length - 1; show(); }
-    if (e.key === 'f') {
-      document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+    function fit() {
+      const sc = Math.min(innerWidth / 1320, innerHeight / 760);
+      slides.forEach(s => s.style.transform = `scale(${sc})`);
     }
-  });
 
-  document.getElementById('deck').addEventListener('click', e => {
-    if (e.target.closest('button') || e.target.closest('a')) return;
-    go(e.clientX > innerWidth / 2 ? 1 : -1);
-  });
+    function show() {
+      slides.forEach((s, k) => s.classList.toggle('active', k === i));
+      const cnt = document.getElementById('cnt');
+      if (cnt) cnt.textContent = `${i + 1} / ${slides.length}`;
+      history.replaceState(null, '', '#' + (i + 1));
+    }
 
-  addEventListener('resize', fit);
-  fit();
-  show();
-</script>
+    function go(d) {
+      i = Math.max(0, Math.min(slides.length - 1, i + d));
+      show();
+    }
+
+    addEventListener('keydown', e => {
+      if (['ArrowRight', 'PageDown', ' ', 'Enter'].includes(e.key)) { e.preventDefault(); go(1); }
+      if (['ArrowLeft', 'PageUp', 'Backspace'].includes(e.key)) { e.preventDefault(); go(-1); }
+      if (e.key === 'Home') { i = 0; show(); }
+      if (e.key === 'End') { i = slides.length - 1; show(); }
+      if (e.key === 'f') {
+        document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+      }
+    });
+
+    document.getElementById('deck').addEventListener('click', e => {
+      if (e.target.closest('button') || e.target.closest('a')) return;
+      go(e.clientX > innerWidth / 2 ? 1 : -1);
+    });
+
+    addEventListener('resize', fit);
+    fit();
+    show();
+  </script>
 </body>
+
 </html>
