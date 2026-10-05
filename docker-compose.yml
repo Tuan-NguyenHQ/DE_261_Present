@@ -119,6 +119,7 @@ services:
       - ./spark_jobs:/opt/spark-jobs
       - ./dbt_project:/opt/dbt
       - ./data/sample:/opt/sample-data
+      - ./data/lake:/opt/lake
       - ./scripts:/opt/scripts
       - pipeline_logs:/opt/logs
     environment:

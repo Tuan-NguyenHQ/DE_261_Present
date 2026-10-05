@@ -225,6 +225,13 @@ def step_dbt_test(date_str, run_id):
     return _dbt("DBT_TEST", ["test"], date_str)
 
 
+def step_export_lake(date_str, run_id):
+    """Step 8: Đồng bộ toàn bộ Data Lake (raw, bronze, silver, quarantine, rejected) ra local filesystem."""
+    return run_step("EXPORT_LAKE", [
+        "python3", "/opt/scripts/export_lake.py", date_str
+    ])
+
+
 STEPS = [
     ("generate_data", step_generate_data),
     ("upload_raw",    step_upload_raw),
@@ -234,6 +241,7 @@ STEPS = [
     ("dbt_seed",      step_dbt_seed),
     ("dbt_run",       step_dbt_run),
     ("dbt_test",      step_dbt_test),
+    ("export_lake",   step_export_lake),
 ]
 
 

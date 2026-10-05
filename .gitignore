@@ -14,6 +14,7 @@ dbt_project/logs/
 data/sample/
 *.csv
 *.xml
+data/lake
 
 # Docker
 docker-compose.override.yml
