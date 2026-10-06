@@ -437,6 +437,148 @@
       font-weight: 600
     }
 
+    /* star schema visual model */
+    .star-schema-canvas {
+      position: relative;
+      width: 100%;
+      height: 468px;
+      margin-top: 4px;
+    }
+
+    .schema-node {
+      position: absolute;
+      background: #ffffff;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 9px;
+      overflow: hidden;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.07);
+      font-size: 12px;
+      z-index: 2;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .schema-node:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.13);
+    }
+
+    .schema-node.fact-node {
+      border: 2px solid #f59e0b;
+      box-shadow: 0 6px 20px rgba(245, 158, 11, 0.18);
+    }
+
+    .schema-header {
+      padding: 6px 11px;
+      font-weight: 700;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #ffffff;
+    }
+
+    .schema-header code {
+      background: rgba(255, 255, 255, 0.22);
+      color: #ffffff;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 13.5px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+    }
+
+    .schema-subhead {
+      background: #fffbeb;
+      color: #92400e;
+      font-size: 11px;
+      padding: 3px 10px;
+      border-bottom: 1px solid #fef3c7;
+      font-weight: 600;
+    }
+
+    .schema-section-title {
+      font-size: 9.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #64748b;
+      padding: 3px 10px 2px;
+      background: #f8fafc;
+      border-bottom: 1px solid #f1f5f9;
+      border-top: 1px solid #f1f5f9;
+    }
+
+    .schema-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 3.2px 10px;
+      border-bottom: 1px solid #f8fafc;
+      font-size: 11.5px;
+      line-height: 1.3;
+    }
+
+    .schema-row:last-child {
+      border-bottom: none;
+    }
+
+    .schema-col-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .schema-col-name {
+      font-family: Consolas, "Courier New", monospace;
+      font-weight: 600;
+      color: #1e293b;
+    }
+
+    .schema-col-type {
+      color: #64748b;
+      font-size: 11px;
+      font-family: Consolas, monospace;
+    }
+
+    .badge-pk {
+      background: #fef3c7;
+      color: #b45309;
+      font-size: 9.5px;
+      font-weight: 700;
+      padding: 1px 4px;
+      border-radius: 3px;
+      border: 1px solid #fde68a;
+    }
+
+    .badge-fk {
+      background: #ede9fe;
+      color: #6d28d9;
+      font-size: 9.5px;
+      font-weight: 700;
+      padding: 1px 4px;
+      border-radius: 3px;
+      border: 1px solid #ddd6fe;
+    }
+
+    .badge-meas {
+      background: #dcfce7;
+      color: #15803d;
+      font-size: 9.5px;
+      font-weight: 700;
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+
+    .badge-attr {
+      background: #f1f5f9;
+      color: #475569;
+      font-size: 9.5px;
+      font-weight: 600;
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+
     #nav {
       position: fixed;
       bottom: 14px;
@@ -820,7 +962,7 @@
     <!-- 7. INPUT CASES: BOOKINGS -->
     <section class="slide">
       <h2>Dữ liệu đầu vào: 10 ca kiểm thử Bookings</h2>
-      <p class="sub">Tập hợp tất cả các dạng dữ liệu dị thường xuất hiện trong hệ thống đặt phòng</p>
+      <!-- <p class="sub">Tập hợp tất cả các dạng dữ liệu dị thường xuất hiện trong hệ thống đặt phòng</p> -->
       <table class="table-compact">
         <tr>
           <th>Mã &amp; File</th>
@@ -1570,70 +1712,303 @@ dups  = ranked.filter(<span class="k">"_rn &gt; 1"</span>).withColumn(<span clas
     <!-- 14. STAR SCHEMA -->
     <section class="slide">
       <h2>Mô hình Star Schema (ClickHouse + dbt)</h2>
-      <p class="sub">Mô hình hình sao chuẩn (không dùng SCD2), tối ưu hoá tốc độ truy vấn phân tích OLAP</p>
-      <div class="grid2">
-        <div>
-          <div class="card" style="border-left:5px solid var(--gold);margin-bottom:12px">
-            <h3 style="color:var(--gold)">⭐ Fact trung tâm: <code>fact_bookings</code></h3>
-            <p class="small"><b>Grain</b>: 1 dòng cho mỗi booking hợp lệ (tổng cộng 6 dòng).</p>
-            <ul class="small" style="margin-top:4px">
-              <li><code>booking_id</code>: Natural Key</li>
-              <li><code>hotel_id</code> &rarr; kết nối <code>dim_hotels</code></li>
-              <li><code>user_id</code> &rarr; kết nối <code>dim_customers</code></li>
-              <li><code>channel_id</code> &rarr; kết nối <code>dim_channels</code></li>
-              <li><code>booked_date</code> &rarr; kết nối <code>dim_dates</code></li>
-              <li><code>nights</code>, <code>total_amount</code>, <code>currency</code>, <code>amount_usd</code></li>
-              <li><code>booking_status</code>, <code>is_cancelled</code> (true nếu huỷ)</li>
-            </ul>
+      <!-- <p class="sub" style="margin-bottom:6px">Lược đồ hình sao phân tích: Fact trung tâm <code>fact_bookings</code>
+        liên kết 1-Nhiều (1:N) tới 4 bảng Dimension chuẩn hoá</p> -->
+
+      <div class="star-schema-canvas">
+        <svg viewBox="0 0 1168 468" preserveAspectRatio="none"
+          style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1">
+          <defs>
+            <marker id="arrow-blue" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6"
+              orient="auto">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#0284c7" />
+            </marker>
+            <marker id="arrow-indigo" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6"
+              orient="auto">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#4f46e5" />
+            </marker>
+            <marker id="arrow-teal" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6"
+              orient="auto">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#0f766e" />
+            </marker>
+            <marker id="arrow-emerald" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6"
+              orient="auto">
+              <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#059669" />
+            </marker>
+            <filter id="glow-line" x="-10%" y="-10%" width="120%" height="120%">
+              <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000" flood-opacity="0.12" />
+            </filter>
+          </defs>
+
+          <!-- Line 1: dim_hotels -> fact_bookings.hotel_id -->
+          <path d="M 310,48 C 344,48 335,138 369,138" stroke="#0284c7" stroke-width="2.5" fill="none"
+            stroke-linecap="round" marker-end="url(#arrow-blue)" filter="url(#glow-line)" />
+          <circle cx="310" cy="48" r="4" fill="#0284c7" />
+          <rect x="314" y="38" width="16" height="15" rx="3" fill="#e0f2fe" />
+          <text x="322" y="49" fill="#0369a1" font-size="10.5" font-weight="700" text-anchor="middle">1</text>
+          <rect x="347" y="126" width="16" height="15" rx="3" fill="#fef3c7" />
+          <text x="355" y="137" fill="#b45309" font-size="10.5" font-weight="700" text-anchor="middle">N</text>
+
+          <!-- Line 2: dim_channels -> fact_bookings.channel_id -->
+          <path d="M 310,293 C 344,293 335,190 369,190" stroke="#4f46e5" stroke-width="2.5" fill="none"
+            stroke-linecap="round" marker-end="url(#arrow-indigo)" filter="url(#glow-line)" />
+          <circle cx="310" cy="293" r="4" fill="#4f46e5" />
+          <rect x="314" y="283" width="16" height="15" rx="3" fill="#ede9fe" />
+          <text x="322" y="294" fill="#4338ca" font-size="10.5" font-weight="700" text-anchor="middle">1</text>
+          <rect x="347" y="178" width="16" height="15" rx="3" fill="#fef3c7" />
+          <text x="355" y="189" fill="#b45309" font-size="10.5" font-weight="700" text-anchor="middle">N</text>
+
+          <!-- Line 3: dim_customers -> fact_bookings.user_id -->
+          <path d="M 858,48 C 824,48 833,164 799,164" stroke="#0f766e" stroke-width="2.5" fill="none"
+            stroke-linecap="round" marker-end="url(#arrow-teal)" filter="url(#glow-line)" />
+          <circle cx="858" cy="48" r="4" fill="#0f766e" />
+          <rect x="838" y="38" width="16" height="15" rx="3" fill="#ccfbf1" />
+          <text x="846" y="49" fill="#0f766e" font-size="10.5" font-weight="700" text-anchor="middle">1</text>
+          <rect x="805" y="152" width="16" height="15" rx="3" fill="#fef3c7" />
+          <text x="813" y="163" fill="#b45309" font-size="10.5" font-weight="700" text-anchor="middle">N</text>
+
+          <!-- Line 4: dim_dates -> fact_bookings.booked_date -->
+          <path d="M 858,293 C 824,293 833,216 799,216" stroke="#059669" stroke-width="2.5" fill="none"
+            stroke-linecap="round" marker-end="url(#arrow-emerald)" filter="url(#glow-line)" />
+          <circle cx="858" cy="293" r="4" fill="#059669" />
+          <rect x="838" y="283" width="16" height="15" rx="3" fill="#d1fae5" />
+          <text x="846" y="294" fill="#065f46" font-size="10.5" font-weight="700" text-anchor="middle">1</text>
+          <rect x="805" y="204" width="16" height="15" rx="3" fill="#fef3c7" />
+          <text x="813" y="215" fill="#b45309" font-size="10.5" font-weight="700" text-anchor="middle">N</text>
+        </svg>
+
+        <!-- 1. DIM_HOTELS (TOP-LEFT) -->
+        <div class="schema-node" style="top:0;left:0;width:310px">
+          <div class="schema-header" style="background:linear-gradient(135deg, #0284c7, #0369a1)">
+            <span>🏨 <code>dim_hotels</code></span>
+            <span class="tag" style="background:rgba(255,255,255,0.25);font-size:10px;padding:1px 6px">DIMENSION</span>
           </div>
-          <div class="card" style="border-left:5px solid var(--accent)">
-            <h3 style="color:var(--accent)">📊 Fact phụ trợ</h3>
-            <p class="small"><b><code>fact_payments</code></b>: 5 dòng giao dịch, ghi nhận số tiền thanh toán và khoản
-              hoàn tiền <code>refund_amount = $500</code> cho đơn BK-006.</p>
-            <p class="small" style="margin-top:4px"><b><code>fact_web_sessions</code></b>: 3 session tổng hợp từ 5
-              clickstream events, xác định tỷ lệ chuyển đổi từ tìm kiếm sang đặt phòng.</p>
+          <div class="schema-row" style="background:#f0f9ff">
+            <div class="schema-col-left">
+              <span class="badge-pk">PK</span>
+              <span class="schema-col-name" style="color:#0369a1">hotel_id</span>
+            </div>
+            <span class="schema-col-type">UInt64 · Khóa KS</span>
+          </div>
+          <div class="schema-row">
+            <div class="schema-col-left"><span class="badge-attr">ATTR</span><span class="schema-col-name">name</span>
+            </div>
+            <span class="schema-col-type">String (Tên KS)</span>
+          </div>
+          <div class="schema-row">
+            <div class="schema-col-left"><span class="badge-attr">ATTR</span><span class="schema-col-name">star_rating,
+                tier</span></div>
+            <span class="schema-col-type">UInt8, String</span>
+          </div>
+          <div class="schema-row">
+            <div class="schema-col-left"><span class="badge-attr">ATTR</span><span class="schema-col-name">city,
+                country, region</span></div>
+            <span class="schema-col-type">Địa danh hành chính</span>
+          </div>
+          <div class="schema-row">
+            <div class="schema-col-left"><span class="badge-attr">ATTR</span><span class="schema-col-name">total_rooms,
+                facilities</span></div>
+            <span class="schema-col-type">UInt32, Array(String)</span>
+          </div>
+          <div
+            style="padding:4px 10px;background:#f8fafc;font-size:10.5px;color:#64748b;border-top:1px solid #f1f5f9;display:flex;justify-content:space-between">
+            <span>Grain: 1 dòng / khách sạn</span><b style="color:#0284c7">5 dòng chuẩn</b>
           </div>
         </div>
-        <div>
-          <h3>Các bảng Dimension chuẩn</h3>
-          <table class="table-compact">
-            <tr>
-              <th>Dimension</th>
-              <th>Khoá chính</th>
-              <th>Các thuộc tính chính</th>
-            </tr>
-            <tr>
-              <td><b><code>dim_hotels</code></b></td>
-              <td><code>hotel_id</code></td>
-              <td>name, tier, star_rating, city, country, region, total_rooms, facilities</td>
-            </tr>
-            <tr>
-              <td><b><code>dim_customers</code></b></td>
-              <td><code>user_id</code></td>
-              <td>email_hash, phone_hash, country, user_segment, loyalty_tier</td>
-            </tr>
-            <tr>
-              <td><b><code>dim_channels</code></b></td>
-              <td><code>channel_id</code></td>
-              <td>channel_name (<code>Mobile App</code>, <code>Web</code>, <code>Partner API</code>, <code>Other</code>)
-              </td>
-            </tr>
-            <tr>
-              <td><b><code>dim_dates</code></b></td>
-              <td><code>date_id</code></td>
-              <td>date, year, quarter, month, day, is_weekend, season</td>
-            </tr>
-          </table>
-          <div class="card small" style="margin-top:14px">
-            <h3>Ưu điểm của mô hình tinh giản</h3>
-            <ul>
-              <li>Không cần xử lý khoảng hiệu lực phức tạp (valid_from/valid_to của SCD2).</li>
-              <li>Surrogate Key trực tiếp dựa trên Natural Key &rarr; Truy vấn trực quan, đơn giản.</li>
-              <li>Dễ dàng mở rộng cho các hệ thống BI như Superset, Metabase, PowerBI.</li>
-            </ul>
+
+        <!-- 2. DIM_CHANNELS (BOTTOM-LEFT) -->
+        <div class="schema-node" style="top:245px;left:0;width:310px">
+          <div class="schema-header" style="background:linear-gradient(135deg, #4f46e5, #6366f1)">
+            <span>📱 <code>dim_channels</code></span>
+            <span class="tag" style="background:rgba(255,255,255,0.25);font-size:10px;padding:1px 6px">DIMENSION</span>
+          </div>
+          <div class="schema-row" style="background:#eef2ff">
+            <div class="schema-col-left">
+              <span class="badge-pk">PK</span>
+              <span class="schema-col-name" style="color:#4338ca">channel_id</span>
+            </div>
+            <span class="schema-col-type">UInt8 · Mã kênh</span>
+          </div>
+          <div class="schema-row">
+            <div class="schema-col-left"><span class="badge-attr">ATTR</span><span
+                class="schema-col-name">channel_name</span></div>
+            <span class="schema-col-type">String (Chuẩn hoá)</span>
+          </div>
+          <div class="schema-row">
+            <div class="schema-col-left"><span class="badge-attr">ATTR</span><span
+                class="schema-col-name">channel_group</span></div>
+            <span class="schema-col-type">Direct / Partner</span>
+          </div>
+          <div
+            style="padding:5px 10px;background:#faf5ff;font-size:10.5px;color:#6b21a8;border-top:1px solid #f3e8ff;line-height:1.35">
+            <b>4 kênh:</b> Mobile App, Web, Partner API, Other
+          </div>
+          <div
+            style="padding:4px 10px;background:#f8fafc;font-size:10.5px;color:#64748b;border-top:1px solid #f1f5f9;display:flex;justify-content:space-between">
+            <span>Grain: 1 dòng / kênh đặt</span><b style="color:#4f46e5">4 dòng chuẩn</b>
+          </div>
+        </div>
+
+        <!-- 3. FACT_BOOKINGS (CENTER) -->
+        <div class="schema-node fact-node" style="top:50px;left:369px;width:430px">
+          <div class="schema-header" style="background:linear-gradient(135deg, #b45309, #d97706)">
+            <span>⭐ <code>fact_bookings</code></span>
+            <span class="tag" style="background:#fef08a;color:#854d0e;font-size:10px;padding:1px 6px">FACT TABLE</span>
+          </div>
+          <div class="schema-subhead">
+            Grain: 1 dòng / booking hợp lệ · Engine: ReplacingMergeTree · 6 dòng
+          </div>
+
+          <div class="schema-section-title">Khóa tự nhiên &amp; Khóa ngoại (Keys / FK)</div>
+          <div class="schema-row" style="background:#fefce8">
+            <div class="schema-col-left">
+              <span class="badge-pk">PK</span>
+              <span class="schema-col-name" style="color:#92400e">booking_id</span>
+            </div>
+            <span class="schema-col-type">String (Natural Key định danh)</span>
+          </div>
+          <div class="schema-row">
+            <div class="schema-col-left">
+              <span class="badge-fk">FK</span>
+              <span class="schema-col-name">hotel_id</span>
+            </div>
+            <span class="schema-col-type">UInt64 &rarr; <code>dim_hotels.hotel_id</code></span>
+          </div>
+          <div class="schema-row">
+            <div class="schema-col-left">
+              <span class="badge-fk">FK</span>
+              <span class="schema-col-name">user_id</span>
+            </div>
+            <span class="schema-col-type">String &rarr; <code>dim_customers.user_id</code></span>
+          </div>
+          <div class="schema-row">
+            <div class="schema-col-left">
+              <span class="badge-fk">FK</span>
+              <span class="schema-col-name">channel_id</span>
+            </div>
+            <span class="schema-col-type">UInt8 &rarr; <code>dim_channels.channel_id</code></span>
+          </div>
+          <div class="schema-row">
+            <div class="schema-col-left">
+              <span class="badge-fk">FK</span>
+              <span class="schema-col-name">booked_date</span>
+            </div>
+            <span class="schema-col-type">Date &rarr; <code>dim_dates.date</code></span>
+          </div>
+
+          <!-- <div class="schema-section-title">Chỉ số đo lường &amp; Tiền tệ (Measures)</div>
+          <div class="schema-row">
+            <div class="schema-col-left"><span class="badge-meas">MEAS</span><span class="schema-col-name">nights</span></div>
+            <span class="schema-col-type">UInt16 (Số đêm lưu trú &gt; 0)</span>
+          </div>
+          <div class="schema-row">
+            <div class="schema-col-left"><span class="badge-meas">MEAS</span><span class="schema-col-name">total_amount, currency</span></div>
+            <span class="schema-col-type">Decimal(12,2), LowCard(String)</span>
+          </div>
+          <div class="schema-row" style="background:#ecfdf5">
+            <div class="schema-col-left"><span class="badge-meas">MEAS</span><span class="schema-col-name" style="color:#047857">amount_usd</span></div>
+            <span class="schema-col-type" style="color:#047857;font-weight:600">Float64 · Khớp ASOF FX tỷ giá</span>
+          </div>
+
+          <div class="schema-section-title">Trạng thái &amp; Cờ logic (Degenerate / Flags)</div>
+          <div class="schema-row">
+            <div class="schema-col-left"><span class="badge-attr">ATTR</span><span class="schema-col-name">booking_status, is_cancelled</span></div>
+            <span class="schema-col-type">LowCard(String), UInt8 (Huỷ/Xác nhận)</span>
+          </div>
+          <div style="padding:4px 10px;background:#fffbeb;font-size:10.5px;color:#92400e;border-top:1px solid #fef3c7;display:flex;justify-content:space-between">
+            <span>Khóa sắp xếp: <code>ORDER BY (booked_date, hotel_id, booking_id)</code></span>
+            <b>dbt Gold Model</b>
+          </div> -->
+        </div>
+
+        <!-- 4. DIM_CUSTOMERS (TOP-RIGHT) -->
+        <div class="schema-node" style="top:0;left:858px;width:310px">
+          <div class="schema-header" style="background:linear-gradient(135deg, #0f766e, #0d9488)">
+            <span>👤 <code>dim_customers</code></span>
+            <span class="tag" style="background:rgba(255,255,255,0.25);font-size:10px;padding:1px 6px">DIMENSION</span>
+          </div>
+          <div class="schema-row" style="background:#f0fdfa">
+            <div class="schema-col-left">
+              <span class="badge-pk">PK</span>
+              <span class="schema-col-name" style="color:#0f766e">user_id</span>
+            </div>
+            <span class="schema-col-type">String · Khóa khách hàng</span>
+          </div>
+          <div class="schema-row">
+            <div class="schema-col-left"><span class="badge-attr">ATTR</span><span
+                class="schema-col-name">email_hash</span></div>
+            <span class="schema-col-type">SHA-256 (PII băm)</span>
+          </div>
+          <div class="schema-row">
+            <div class="schema-col-left"><span class="badge-attr">ATTR</span><span
+                class="schema-col-name">phone_hash</span></div>
+            <span class="schema-col-type">SHA-256 (PII băm)</span>
+          </div>
+          <div class="schema-row">
+            <div class="schema-col-left"><span class="badge-attr">ATTR</span><span class="schema-col-name">country,
+                user_segment</span></div>
+            <span class="schema-col-type">Quốc gia, Phân khúc</span>
+          </div>
+          <div class="schema-row">
+            <div class="schema-col-left"><span class="badge-attr">ATTR</span><span
+                class="schema-col-name">loyalty_tier</span></div>
+            <span class="schema-col-type">BRONZE / SILVER / GOLD</span>
+          </div>
+          <div
+            style="padding:4px 10px;background:#f8fafc;font-size:10.5px;color:#64748b;border-top:1px solid #f1f5f9;display:flex;justify-content:space-between">
+            <span>Grain: 1 dòng / người dùng CRM</span><b style="color:#0f766e">5 dòng chuẩn</b>
+          </div>
+        </div>
+
+        <!-- 5. DIM_DATES (BOTTOM-RIGHT) -->
+        <div class="schema-node" style="top:245px;left:858px;width:310px">
+          <div class="schema-header" style="background:linear-gradient(135deg, #059669, #10b981)">
+            <span>📅 <code>dim_dates</code></span>
+            <span class="tag" style="background:rgba(255,255,255,0.25);font-size:10px;padding:1px 6px">DIMENSION</span>
+          </div>
+          <div class="schema-row" style="background:#ecfdf5">
+            <div class="schema-col-left">
+              <span class="badge-pk">PK</span>
+              <span class="schema-col-name" style="color:#065f46">date_id</span>
+            </div>
+            <span class="schema-col-type">UInt32 (YYYYMMDD)</span>
+          </div>
+          <div class="schema-row">
+            <div class="schema-col-left"><span class="badge-attr">ATTR</span><span class="schema-col-name">date</span>
+            </div>
+            <span class="schema-col-type">Date (Chuẩn ISO-8601)</span>
+          </div>
+          <div class="schema-row">
+            <div class="schema-col-left"><span class="badge-attr">ATTR</span><span class="schema-col-name">year,
+                quarter, month, day</span></div>
+            <span class="schema-col-type">UInt16 / UInt8 / UInt8</span>
+          </div>
+          <div class="schema-row">
+            <div class="schema-col-left"><span class="badge-attr">ATTR</span><span
+                class="schema-col-name">is_weekend</span></div>
+            <span class="schema-col-type">UInt8 (1: Cuối tuần / 0)</span>
+          </div>
+          <div class="schema-row">
+            <div class="schema-col-left"><span class="badge-attr">ATTR</span><span class="schema-col-name">season</span>
+            </div>
+            <span class="schema-col-type">Spring / Summer / Autumn...</span>
+          </div>
+          <div
+            style="padding:4px 10px;background:#f8fafc;font-size:10.5px;color:#64748b;border-top:1px solid #f1f5f9;display:flex;justify-content:space-between">
+            <span>Grain: 1 dòng / ngày lịch</span><b style="color:#059669">Date dimension</b>
           </div>
         </div>
       </div>
+
+      <!-- <div class="card small"
+        style="margin-top:8px;padding:7px 14px;background:#f8fafc;border-left:4px solid var(--gold);display:flex;align-items:center;justify-content:space-between">
+        <span><b>⭐ Điểm cốt lõi Star Schema:</b> Fact trung tâm chỉ lưu <b>Khóa ngoại (FK)</b> và <b>Chỉ số đo lường
+            (Measures)</b>. Loại bỏ hoàn toàn text dư thừa &rarr; Tối ưu hóa nén Columnar và tốc độ tổng hợp Aggregation
+          của ClickHouse.</span>
+        <span class="mono"
+          style="font-size:11.5px;background:#e2e8f0;padding:2px 8px;border-radius:4px;white-space:nowrap;margin-left:10px">Quan
+          hệ 1 : N (1 Dim &rarr; Nhiều Fact)</span>
+      </div> -->
       <div class="foot"><span>TravelHub Data Platform — Sample Showcase</span><span class="pg"></span></div>
     </section>
 
